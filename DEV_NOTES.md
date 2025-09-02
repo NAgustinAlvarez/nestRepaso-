@@ -1,3 +1,5 @@
+//para cambiar los archivos a LF npx prettier --write .
+
 Repaso de Nest.
 1-Nest new --nombre-del-proyecto.
 
@@ -225,3 +227,90 @@ getHello(): string {
 return this.appService.getHello();
 }
 }
+
+16: Intermodular dependency.
+
+En imports irá la interdependencia de modulos. En providers irán solo los servicios quizás de otros modulos.
+@Module({
+controllers: [UsersController],
+providers: [UsersService], // ✅ se declara acá
+exports: [UsersService], // ✅ solo si lo necesitan otros módulos
+})
+export class UsersModule {}
+ts
+Copiar
+Editar
+// posts.module.ts
+@Module({
+controllers: [PostsController],
+providers: [PostsService],
+imports: [UsersModule], // ✅ trae consigo UsersService exportado
+})
+export class PostsModule {}
+
+17: Circular dependency.
+Son dependencias que se necesitan mutuamente. Por ejemplo un modulo usuario, con un modulo auth. Al hacer login desde el servicio de auth se solicitará un usuario del modulo users. Y para traer por ejemplo algún dato de un usuario desde el modulo de users se solicitará a auth.
+Las dependencias circulares se manejan distinto porque sino se generá un bucle infinito.
+Para eso primeramente se exportan los servicio de cada modulo. Luego se utiliza forwardRef(()=>Modulo que se trae) en el import. Y en el servicio se usa @Inject dentro del constructor con forwardRef(()=>Servicio circular), además de declararse normalmente. Ej:
+@Module({
+controllers: [AuthController],
+providers: [AuthService],
+exports: [AuthService],
+imports: [forwardRef(() => UsersModule)],
+})
+export class AuthModule {}
+export class AuthService {
+constructor(
+@Inject(forwardRef(() => UserService))
+private readonly userService: UserService,
+) {}}
+
+18: Swagger.
+npm i @nestjs/swagger
+
+a. Primero se genera el config donde se define la versión, el titulo, la descripción, etc. const config = new DocumentBuilder()
+.setTitle('Nestjs Repaso')
+.setDescription('Use the base API url as http://localhost:300')
+.setVersion('1.0')
+.build();
+b. Se crea el documento con la app y el config. Ej: const document = SwaggerModule.createDocument(app, config);
+c. Se completa el setup con el path de la documentación, la app en sí y luego el documento. Ej: SwaggerModule.setup('api', app, document);
+
+ahora en la ruta /api estará la documentación.
+
+\*Diferenciación de endpoints en documentación.
+Se hace en el controlador con el decorador @ApiTags("nombre")
+
+\*Declaración de valores para path, a veces swagger no infiere directamente entonces es necesario declararlas en el controlador. Asi en el endpoint los parametros estarán mejor detallados. Ej:
+
+@Get('/:id')
+@ApiParam({
+name: 'id',
+type: Number,
+required: true,
+description: 'ID único del usuario que se desea obtener',
+example: 1,
+})
+@ApiQuery({
+name: 'limit',
+type: Number,
+required: false,
+description: 'Cantidad máxima de resultados a devolver (paginación)',
+example: 10,
+})
+
+\*Declaración de operación. Descripción de cada endpoint
+@Get('/:id')
+@ApiOperation({
+description: 'Fetches a list of registered users on the application',
+})
+
+\*Declaración de respuestas.
+@ApiResponse({ status: 200, description: 'Users fetched succesfully' })
+
+19: Sql - TypeOrm
+\*primeramente instalamos pgadmin, luego agregamos el path a windows.
+
+\*luego en consola: npm i typeorm @nestjs/typeorm pg
+
+20: conexión
