@@ -62,9 +62,8 @@ export class UsersController {
     return this.userService.findOneById(getUserParamDto);
   }
   @Post()
-  createUsers(@Body() body: CreateUserDto) {
-    console.log(body);
-    return 'You sent a Post Request';
+  createUsers(@Body() createUserDto: CreateUserDto) {
+    return this.userService.createUser(createUserDto);
   }
 
   @Patch()

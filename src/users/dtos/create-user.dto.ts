@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   IsEmail,
   IsNotEmpty,
@@ -13,7 +12,7 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(3)
-  @MaxLength(10)
+  @MaxLength(96)
   firstName: string;
 
   @IsString()

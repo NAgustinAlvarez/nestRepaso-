@@ -313,4 +313,116 @@ description: 'Fetches a list of registered users on the application',
 
 \*luego en consola: npm i typeorm @nestjs/typeorm pg
 
-20: conexión
+20: conexión a typeorm. La mayoría de info esta en : https://typeorm.io/docs/data-source/data-source-options
+En nest el dataSource puede agregarse directamente a el modulo de app. de está forma: export const AppDataSource = new DataSource({
+type: "postgres",
+host: "localhost",
+port: 5432,
+username: "test",
+password: "test",
+database: "test",
+synchronize: true,
+logging: true,
+entities: [Post, Category],
+subscribers: [],
+migrations: [],
+})
+
+21: env. files (más adelante en curso)
+Para que el modulo del dataSource sea dinámico debemos usar forRootAsync. Para que lea archivos .env. Que cambiaran el comportamiento o serviran para la seguridad de la bd.
+TypeOrmModule.forRootAsync({
+imports: [],
+inject: [],
+useFactory: () => ({
+type: 'postgres',
+entities: [],
+synchronize: true,
+port: 5432,
+username: 'postgres',
+password: 'nico5329',
+host: 'localhost',
+database: 'postgres',
+}),
+}),
+
+22. Entendimiento de estructura.
+    Primeramente es necesario generar archivos de entidades. Son clases con decoradores que generan las entidades con cuántas columnas y clases tendrá la entidad.Agregamos esta entidad a la declaración de entidades en la configuracion de typeOrm. Luego typeOrm cuando sea necesario; inyecta el repositorio de la entidad a el servicio del modulo que se requiera. Y así se podrá comunicarse con la bd.
+
+23: Entidad.
+Se crea igual que una clase y luego tendrá que agregarse a la configuración de typeOrm terminan en entity.ts. Se definen columnas de la tabla. Ej:
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class User {
+@PrimaryGeneratedColumn()
+id: number;
+@Column()
+firstName: string;
+@Column()
+lastName: string;
+@Column()
+email: string;
+@Column()
+password: string;
+}
+
+24: Tipo y configuración en la entidad.
+
+Tipos de columnas de entidades https://typeorm.io/docs/entity/entities#column-types en la "parte" column types.
+Para id, enum, json.
+
+Tipo de configuracion de la columna: https://typeorm.io/docs/entity/entities/#column-options
+Para nombre especifico, tipo, longitud, unicidad, valor default, nullable(valor nulo o vacio).
+Ej : @Column({
+name: 'full_name', // 👈 así se llamará en la DB
+type: 'varchar',
+length: 150,
+unique: true,
+})
+name: string;
+
+24a: @DeleteDateColumn(), @UpdateDateColumn(), @CreateDateColumn()
+
+En la columna sirve para el soft delete y actualizaciones del usuario, registran fechas por si solas al hacer save o softDelete.
+
+Cuando usás soft delete en TypeORM:
+await userRepository.softDelete(1);
+Lo que ocurre es:
+NO se borra el registro de la base de datos.
+Se actualiza la columna deletedAt con la fecha/hora actual (NOW() del servidor).
+
+Luego al buscar con los metodos normales no esta columna aparece oculta a menos que uses. await userRepository.find({
+withDeleted: true, // incluye los "soft deleted"
+});
+
+Más decoradores de diferentes tipos: https://typeorm.io/docs/help/decorator-reference/#column-decorators
+25: Creación de repositorio.
+Por ejemplo en mi caso en database/postgres/schemas/public/tables se encuentran las tablas creadas para cada entidad.
+
+a- Vamos al service del modulo. y lo inyectamos con el decorador @InjectRepository(<entidad>) ej:
+
+constructor(
+@InjectRepository(User)
+private readonly usersRepository: Repository<User>)
+
+b- Vamos al modulo y donde va a crearse el repositorio y en imports declaramos la entidad con el modulo de typeOrm. EJ:
+@Module({
+controllers: [UsersController],
+providers: [UserService],
+imports: [ TypeOrmModule.forFeature([User])],
+exports: [UserService],
+})
+c- uso en servicio ejemplo.
+
+async createUser(createUserDto: CreateUserDto) {
+//Check if the user exist with same mail
+const existingUser = await this.usersRepository.findOne({
+where: { email: createUserDto.email },
+});
+//Handle exception}
+
+    //Create new user
+    let newUser = this.usersRepository.create(createUserDto);
+    newUser = await this.usersRepository.save(newUser);
+
+}
