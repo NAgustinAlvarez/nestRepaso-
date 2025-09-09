@@ -426,3 +426,162 @@ where: { email: createUserDto.email },
     newUser = await this.usersRepository.save(newUser);
 
 }
+
+26- Autoload entities:
+Type Orm puede cargar las entidades por si sola si dentro de la configuración detallamos autoloadEntities: true.
+Pero tenemos que declarar a cada entidad en el modulo necesario con TypeOrmModule.forFeture([<nombreDeEntidad>])
+Definís una entidad con @Entity().
+
+a-Usás TypeOrmModule.forFeature([User]).
+
+b-Nest registra un provider para el repositorio de User.
+
+c-Si tenés autoLoadEntities: true, además esa entidad se suma automáticamente al entities[] global de TypeORM.
+
+d-Ahora podés inyectar el repositorio en tu servicio y trabajar con la tabla correspondiente.
+
+ej: @Module({
+controllers: [PostsController],
+providers: [PostsService],
+imports: [UsersModule, TypeOrmModule.forFeature([Post])],
+})
+export class PostsModule {}
+
+27- Relación One to One.
+En una tabla una fila está relacionada solo a una fila de otra tabla
+
+@OneToOne se pone en ambas entidades
+
+@JoinColumn Marca cuál de las tablas es la dueña de la relación (la que tendrá la foreign key). Sin esto, TypeORM no sabe dónde guardar la FK.
+
+28- Creación de la relacion sin cascada.
+a. Asociamos el repositorio al modulo con typeOrmModule.forFeature por ejemplo en esta caso metaOptions.
+@Module({
+controllers: [PostsController],
+providers: [PostsService],
+imports: [UsersModule, TypeOrmModule.forFeature([Post, MetaOptions])],
+})
+export class PostsModule {}
+
+el servicio comprueba al existencia de la propiedad en el json y crea una instancia para luego guardarla. Y asignarsela a la tabla de post. async create(createPostDto: CreatePostDto) {
+//create metaOptions before post
+let metaOptions = createPostDto.metaOptions
+? this.metaOptionRepository.create(createPostDto.metaOptions)
+: null;
+if (metaOptions) {
+await this.metaOptionRepository.save(metaOptions);
+}
+//create post
+let post = this.postRepository.create(createPostDto);
+//add metaOptions to the post
+if (metaOptions) {
+post.metaOptions = metaOptions;
+}
+//return the post
+return await this.postRepository.save(post);
+}
+
+29. Creación de relacion con cascada.
+    Es la mejor forma. Ya que lo otro genera codigo innecesario.
+    Por ejemplo en la entidad post del ejemplo anterior agregamos la propiedad cascade. @OneToOne(() => MetaOptions, {
+    cascade: ['remove', 'insert'],
+    nullable: true,
+    })
+    @JoinColumn()
+    metaOptions: MetaOptions | null;
+    }
+
+Que lo que hace es actuar segun lo que le asignemos, en este caso al momento de crear el post se va a crear la tabla para metaOptions y se va a insertar en post.
+
+Ahora el create quedaría así:
+
+async create(createPostDto: CreatePostDto) {
+let post = this.postRepository.create(createPostDto);
+return await this.postRepository.save(post);
+}
+
+Esto es asignable para cuando tenés una relación como @OneToOne o @OneToMany.
+¿Para que sirven las especificaciones? Sirve para que ciertas operaciones (insert, update, remove, etc.) que hagas en la entidad principal se propaguen automáticamente a la entidad relacionada.
+
+Opciones posibles en cascade: [""]
+Podés poner un array con las operaciones que querés habilitar. Estas son las válidas:
+"insert" → inserta automáticamente la entidad relacionada.
+"update" → actualiza automáticamente la entidad relacionada.
+"remove" → elimina automáticamente la entidad relacionada.
+"soft-remove" → aplica soft delete en la entidad relacionada.
+"recover" → restaura una entidad que fue soft-deleted.
+
+30. Eager Loader (carga embebida), query related entities.
+    La carga de tablas con relaciones no se hace por defecto, es decir al momento de hacer fetch los datos que no sean propios de la tabla no serán traidos, (claves, ids de otras tablas). Dos formas de traer estos datos al hacer fetch.
+
+a. Declarar la relacion en el servicio:
+async findAll(userId: GetUsersParamDto) {
+const user = this.userService.findOneById(userId);
+let posts = await this.postRepository.find({
+relations: { metaOptions: true },
+});
+return posts;
+}
+
+b. En la entidad declarar la propiedad eager en la columna de la ralacion:
+
+31. Deleting related entities. Borrar entidades relacionadas.
+    Cascade de TypeORM
+    Funciona solo cuando usás métodos de TypeORM (remove, save, softRemove).
+
+Se propaga desde el propietario hacia la entidad relacionada.
+Si ya tenés cascade: ['remove'] en la relación, podés dejar tu método así:
+
+async delete(id: number) {
+const post = await this.postRepository.findOneBy({ id });
+if (!post) return null;
+
+await this.postRepository.remove(post); // borra post y metaOptions
+return post;
+}
+
+A su vez también se puede eliminar con el metodo .delete en el repositorio. A la entidad asociada se le agrega como propiedad onDelete.
+🔹 1. onDelete en la base de datos
+Funciona a nivel de la columna FK.
+La FK apunta al padre, así que la DB sabe que cuando borrás el registro padre, debe borrar el hijo.
+No importa quién es el propietario en TypeORM: lo importante es dónde está la FK en la tabla.
+
+@OneToOne(() => Post, (post) => post.metaOptions, { onDelete: 'CASCADE' })
+@JoinColumn()
+post: Post;
+
+32. Bidireccionalidad.
+    se agrega el one to one a la entidad hija (metaOptions), con la entidad a la que se relaciona (post) y una funcion que devuelve la relacion inversa.
+    @Entity()
+    export class MetaOptions {
+    @PrimaryGeneratedColumn()
+    id: number;
+    @Column({ type: 'json', nullable: false })
+    metaValue: string;
+
+            @CreateDateColumn()
+            createdDate: Date;
+
+            @UpdateDateColumn()
+            updateDate: Date;
+
+            @OneToOne(() => Post, (post) => post.metaOptions)
+            post: Post;
+            }
+
+A su vez a la entidad padre (post) tambien se le agrega al arrow function con la relacion inversa.
+@OneToOne(() => MetaOptions, (metaOptions) => metaOptions.post, {
+cascade: ['remove', 'insert'],
+eager: true,
+nullable: true,
+})
+@JoinColumn()
+metaOptions: MetaOptions | null;
+
+33.One to many.
+se usan los decoradores con dos arrow function, la primera apuntando a la entidad y la segunda con el aspecto de la entidad.
+Ej:
+@OneToMany(() => Post, (post) => post.author)
+post: Post[];
+@ManyToOne(() => User, (user) => user.post)
+author: User;

@@ -1,17 +1,18 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { PostsService } from './providers/posts.service';
 import { UserService } from 'src/users/providers/users.service';
 import { GetUsersParamDto } from 'src/users/dtos/get-user.dto';
 import { CreatePostDto } from './dtos/create-post.dto';
-import { PatchPostDto } from './dtos/patch-post.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -22,38 +23,16 @@ export class PostsController {
 
   @Get('/:id')
   getPost(@Param('id', ParseIntPipe) userId: GetUsersParamDto) {
-    return this.userService.findOneById(userId);
+    return this.postsService.findAll(userId);
   }
-  @Get()
-  getAllPost() {
-    return this.postsService.findAll();
-  }
+
   @Post()
-  createPost(@Body() body: CreatePostDto) {
-    console.log(body);
-    return 'okaay';
+  create(@Body() createPostDto: CreatePostDto) {
+    return this.postsService.create(createPostDto);
   }
-  @Patch()
-  updateUser(@Body() patchPost: PatchPostDto) {
-    console.log(patchPost);
+
+  @Delete()
+  deletePost(@Query('id', ParseIntPipe) id: number) {
+    return this.postsService.delete(id);
   }
-  // @Get()
-  // findAll() {
-  //   return this.postsService.findAll();
-  // }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.postsService.findOne(+id);
-  // }
-
-  // @Patch(':id')
-  // update(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
-  //   return this.postsService.update(+id, updatePostDto);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.postsService.remove(+id);
-  // }
 }

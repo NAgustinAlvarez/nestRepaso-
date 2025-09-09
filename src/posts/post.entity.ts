@@ -1,11 +1,18 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { PostType, Status } from './dtos/create-post.dto';
-import { CreatePostMetaOptionsDto } from './dtos/create-post-metadata.dto';
+import { MetaOptions } from 'src/meta-options/meta-option.entity';
+import { User } from 'src/users/user.entity';
 
 @Entity()
 export class Post {
   @PrimaryGeneratedColumn()
-  id: string;
+  id: number;
 
   @Column({ type: 'varchar', length: 255, nullable: false })
   title: string;
@@ -42,6 +49,13 @@ export class Post {
 
   @Column('simple-array', { nullable: true })
   tags: string[];
-  @Column({ type: 'jsonb', nullable: true })
-  metaOptions: CreatePostMetaOptionsDto[];
+
+  @OneToOne(() => MetaOptions, (metaOptions) => metaOptions.post, {
+    cascade: ['remove', 'insert'],
+    eager: true,
+    nullable: true,
+  })
+  metaOptions: MetaOptions | null;
+  @ManyToOne(() => User, (user) => user.post)
+  author: User;
 }

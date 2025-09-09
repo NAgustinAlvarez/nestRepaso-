@@ -15,7 +15,7 @@ export class Tag {
   @Column({ type: 'varchar', length: 256, nullable: false, unique: true })
   name: string[];
 
-  @Column({ type: 'varchar', length: 512, nullable: false, unique: true })
+  @Column({ type: 'varchar', length: 256, nullable: false, unique: true })
   slug: string;
 
   @Column({ type: 'text', nullable: true })
@@ -25,7 +25,7 @@ export class Tag {
   schema?: string;
 
   @Column({ type: 'varchar', length: 1024, nullable: true })
-  featuredImageUrl: string;
+  featuredImageUrl?: string;
 
   @CreateDateColumn()
   createDate: Date;
