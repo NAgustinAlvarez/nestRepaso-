@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { GetUsersParamDto } from '../dtos/get-user.dto';
@@ -6,14 +7,18 @@ import { Repository } from 'typeorm';
 import { User } from '../user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateUserDto } from '../dtos/create-user.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+
     @Inject(forwardRef(() => AuthService))
     private readonly authservice: AuthService,
+
+    private readonly configService: ConfigService,
   ) {}
 
   async createUser(createUserDto: CreateUserDto) {
@@ -33,14 +38,17 @@ export class UserService {
 
   findAll(limit: number, page: number) {
     const isAuth = this.authservice.isAuth();
-    console.log(isAuth);
+    const environment = this.configService.get<string>('S3_BUCKET');
+    console.log(environment);
+    console.log(process.env.NODE_ENV);
+    // console.log(isAuth);
     return [
       { firstName: 'John', email: 'john@doe.com' },
       { firstName: 'Alice', email: 'alice@doe.com' },
     ];
   }
 
-  findOneById(id: GetUsersParamDto) {
-    return { id: 1, firstName: 'Alice', email: 'alice@doe.com' };
+  async findOneById(id: number) {
+    return await this.usersRepository.findOneBy({ id });
   }
 }

@@ -1,6 +1,8 @@
 import {
   Column,
   Entity,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
@@ -8,6 +10,7 @@ import {
 import { PostType, Status } from './dtos/create-post.dto';
 import { MetaOptions } from 'src/meta-options/meta-option.entity';
 import { User } from 'src/users/user.entity';
+import { Tag } from 'src/tags/tag.entity';
 
 @Entity()
 export class Post {
@@ -47,8 +50,9 @@ export class Post {
   @Column({ type: 'timestamp', nullable: true }) //datetyme in mysql
   publishOn: Date;
 
-  @Column('simple-array', { nullable: true })
-  tags: string[];
+  @ManyToMany(() => Tag, (tag) => tag.posts, { eager: true })
+  @JoinTable()
+  tags?: Tag[];
 
   @OneToOne(() => MetaOptions, (metaOptions) => metaOptions.post, {
     cascade: ['remove', 'insert'],
@@ -56,6 +60,7 @@ export class Post {
     nullable: true,
   })
   metaOptions: MetaOptions | null;
-  @ManyToOne(() => User, (user) => user.post)
+
+  @ManyToOne(() => User, (user) => user.post, { eager: true })
   author: User;
 }

@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
+  IsInt,
   IsISO8601,
   IsJSON,
   IsNotEmpty,
@@ -105,16 +106,15 @@ export class CreatePostDto {
   publishOn?: Date;
 
   @ApiPropertyOptional({
-    description: 'Optional list of tags for the post',
-    example: ['nestjs', 'typescript', 'blog'],
+    description: 'Array of ids of tags',
+    example: [1, 2],
     isArray: true,
     type: String,
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  @MinLength(3, { each: true })
-  tags?: string[];
+  @IsInt({ each: true })
+  tags?: number[];
 
   @ApiPropertyOptional({
     type: () => CreatePostMetaOptionsDto,
@@ -124,4 +124,9 @@ export class CreatePostDto {
   @IsOptional()
   @Type(() => CreatePostMetaOptionsDto)
   metaOptions?: CreatePostMetaOptionsDto | null;
+
+  @ApiProperty({ type: 'integer', required: true, example: 1 })
+  @IsInt()
+  @IsNotEmpty()
+  authorId: number;
 }

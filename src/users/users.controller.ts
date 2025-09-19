@@ -55,7 +55,7 @@ export class UsersController {
     example: 1,
   })
   getUsers(
-    @Param() getUserParamDto: GetUsersParamDto,
+    @Param() getUserParamDto: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {

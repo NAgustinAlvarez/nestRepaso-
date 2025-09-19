@@ -11,7 +11,7 @@ export class AuthService {
   ) {}
 
   login(id: number, email: string, password: string) {
-    const user = this.userService.findOneById(id as GetUsersParamDto);
+    const user = this.userService.findOneById(id);
     return 'SAMPLE_TOKEN';
   }
 

@@ -524,6 +524,10 @@ return posts;
 }
 
 b. En la entidad declarar la propiedad eager en la columna de la ralacion:
+Por ejemplo esta entidad siempre va a traer los autores
+@ManyToOne(() => User, (user) => user.post, { eager: true })
+author: User;
+Por eager:true.
 
 31. Deleting related entities. Borrar entidades relacionadas.
     Cascade de TypeORM
@@ -585,3 +589,192 @@ Ej:
 post: Post[];
 @ManyToOne(() => User, (user) => user.post)
 author: User;
+
+34.Many to many relationship.
+Usan una tabla intermedia para el relacionamiento.
+Una tabla será la que sea propietaria de la relacion. Con el join column.
+@ManyToMany(() => Tag)
+@JoinTable()
+tags?: Tag[];
+Si eliminamos este campo, por ejemplo en este caso eliminamos el post, el campo en la tabla intermedia que contenía la relación se borrará tambien. Efecto en cascada.
+No se debe aclarar como en otros casos el cascade.
+
+35. Many to many bidireccional.
+    Al igual que las otras relaciones se pone en cada entidad y se hace un call al inverso.
+    @ManyToMany(() => Tag, (tag) => tag.posts, { eager: true })
+    @JoinTable()
+    tags?: Tag[];
+
+36. Cascade delete with many to many.
+    Por ejemplo en la relacion muchos a muchos post-tags. Donde muchos post pueden tener un mismo tag y un tag puede tener muchos post. Si eliminamos un post se va a generar una eliminación por cascada del campo en la tabla intermedia, ya que tiene el joinColum que provoca esto.
+    Pero si queremos eliminar un tag de la base de datos; tag no tiene joinColumn.Y se producirá un error.
+
+    Aparecerá algo así: QueryFailedError: update o delete en «tag» viola la llave foránea «FK_41e7626b9cc03c5c65812ae55e8» en la tabla «post_tags_tag» QueryFailedError: update o delete en «tag» viola la llave foránea «FK_41e7626b9cc03c5c65812ae55e8» en la tabla «post_tags_tag»
+
+    Para generar la eliminación correcta vamos a la entidad y en la relacion many to many tenemos que aclarar que en la elimnación se genere la eliminación de la tabla intermedia directamente generado por la base de datos. No por typeOrm.
+
+    @ManyToMany(() => Post, (post) => post.tags, { onDelete: 'CASCADE' })
+    posts: Post;
+    @CreateDateColumn()
+    createDate: Date;
+
+37. Soft delete configuration.
+    No se eliminan ni la columna intermedia, ni el campo de la tabla.
+    Solo se genera el timeStamp de delete cuando se invoca el metodo de softDelete. Este campo de la entidad se declara en la entidad.
+
+    \*en entidad
+    @DeleteDateColumn()
+    deleteDate: Date;
+
+    \*servicio
+
+    async softDelete(id: number) {
+    await this.tagsRepository.softDelete(id);
+    return { softDelete: true, id };
+    }
+
+    \*Luego surgen varias variantes para utilizar estos campos.
+    async findAll() {
+    // solo devuelve los que no están "borrados"
+    return await this.tagsRepository.find();
+    }
+
+    async findAllWithDeleted() {
+    // incluye los que tienen deleteDate
+    return await this.tagsRepository.find({ withDeleted: true });
+    }
+
+    async restore(id: number) {
+    // restaura un registro "soft deleted"
+    await this.tagsRepository.restore(id);
+    return { restored: true, id };
+
+38. Enviroments.
+    Es usual que contemos con datos que cambien según las necesidades. Por ejemplo en el desarrollo de una aplicación podemos no trabajar en la misma base de datos que en la producción, o en el testing. Para eso existen los enviroments en node y nestJs.
+    En una aplicación casi siempre tenés diferentes entornos de ejecución:
+
+    Development → donde probás y debuggeás.
+    Testing → usado para correr pruebas automatizadas.
+    Production → el entorno real que usan los usuarios.
+    Cada entorno necesita configuraciones distintas:
+    Base de datos diferente.
+    Tokens o keys distintas (por ejemplo, Mercado Pago sandbox vs. producción).
+    URL de APIs externas.
+    Parámetros de logs, seguridad, etc.
+    👉 Para manejar eso se usan los environment variables, normalmente en archivos .env.
+
+39. ConfigModule.
+    npm i @nestjs/config
+
+    Para acceder a las variables se utiliza un modulo especial entregado por nestjs llamado configModule.
+    Para que las varibles sean accesibles en todos los modulos vamos a nuestro app.module y declaramos el config con los demás módulos, con una propiedad global.
+
+    ConfigModule.forRoot({ isGlobal: true })
+
+    Luego para usarlo por ejemplo en un servicio.
+    private readonly configService: ConfigService, en el constructor, importamos el service del config y por ejemplo para obtener las variables almacenadas se pone la clave y un metodo.
+
+    findAll(limit: number, page: number) {
+    const enviroment = this.configService.get('S3_BUCKET');
+    console.log(enviroment);
+    }
+
+    por ejemplo accede a la clave en S3_BUCKET.
+
+40. NODE_ENV y test
+
+🔹 ¿Qué es NODE_ENV?
+
+NODE_ENV es una variable de entorno estándar en Node.js.
+
+Se usa para indicar en qué modo está corriendo tu app:
+
+"development" → cuando estás desarrollando.
+
+"production" → cuando la app está en un servidor real.
+
+"test" → cuando ejecutás tests (Jest, e2e, unit tests).
+
+NestJS y muchas librerías (TypeORM, dotenv, etc.) leen NODE_ENV para cargar configuraciones diferentes (por ejemplo, distinta DB para testing, logging deshabilitado en prod, etc.).
+
+En los test e2e se analiza todo el recorrido de esa función o módulo, por eso en nuestro test e2e creado por default por nest es necesario mostrarle todo nuestro proyecto. Los test e2e a diferencia de los unitarios usan la configuración en su propio json. En cambio los unitarios usan el package.json. Cambiamos (en e2e.json) el rootDir a ../ y el modulePath para que pueda resolver importaciones.
+{
+"moduleFileExtensions": ["js", "json", "ts"],
+"rootDir": "../",
+"modulePaths": ["<rootDir>"],
+"moduleNameMapper": {
+"^src/(.\*)$": "<rootDir>/src/$1"
+  },
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+"transform": {
+"^.+\\.(t|j)s$": "ts-jest"
+}
+}
+
+moduleFileExtensions
+
+Extensiones que Jest considera al resolver imports (.ts, .js, .json).
+
+rootDir: "../"
+
+Arranca desde la raíz del proyecto (sube un nivel desde /test).
+
+Así Jest puede acceder a src/, package.json, etc.
+
+modulePaths: ["<rootDir>"]
+
+Le decís a Jest: “cuando busques módulos, arrancá desde el root del proyecto”.
+
+Eso permite que puedas hacer imports como:
+
+import { AppModule } from 'src/app.module';
+
+en lugar de:
+
+import { AppModule } from '../src/app.module';
+
+testEnvironment: "node"
+
+Los tests corren en un entorno de Node (no en JSDOM como en tests de frontend).
+
+testRegex: ".e2e-spec.ts$"
+
+Solo ejecuta archivos que terminen en .e2e-spec.ts.
+
+transform: { "^.+\\.(t|j)s$": "ts-jest" }
+
+Usa ts-jest para compilar .ts y .js antes de correrlos.
+
+Para cambiar la fuente de los test unitario vamos a package.json en la sección jest. y buscamos y cambiamos por esto:
+"jest": {
+"moduleFileExtensions": [
+"js",
+"json",
+"ts"
+],
+"rootDir": "./",
+"modulePaths": [
+"<rootDir>",
+],
+"testRegex": "._\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+},
+"collectCoverageFrom": [
+"\*\*/_.(t|j)s"
+],
+"coverageDirectory": "../coverage",
+"testEnvironment": "node"
+}
+
+\*Parte final.
+Al hacer npm run test:e2e deberíamos obtener el consologeo de test, ya que es la variable utilizada en test.
+
+|funcion en el e2e|
+it('/ (GET)', () => {
+console.log(process.env.NODE_ENV);
+return request(app.getHttpServer()).get('/').expect(404);
+});
+
+41. Conditionally loading enviroment

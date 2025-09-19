@@ -3,7 +3,7 @@ Content-Type: application/json
 {
   "title": "Mi primer post",
   "postType": "post",
-  "slug": "mi-primer-post",
+  "slug": "mi-primer-post220",
   "status": "draft",
   "content": "Este es el contenido del post.",
   "schema": "{\"type\":\"object\",\"properties\":{\"example\":{\"type\":\"string\"}}}",
@@ -12,5 +12,7 @@ Content-Type: application/json
   "tags": ["nestjs", "typescript", "blog"],
 "metaOptions": {
     "metaValue": "{\"sidebarEnabled\": true, \"footerActive\": true}"
-  }
+  },
+  "authorId": 1,
+  "tags": [1]
 }

@@ -1,4 +1,4 @@
 PATCH http://localhost:3000/posts 
 Content-Type: application/json
-{"id": 2,
-"postType": "post"}
+{"id": 14,
+"tags": [1,3]}
