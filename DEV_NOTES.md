@@ -777,4 +777,229 @@ console.log(process.env.NODE_ENV);
 return request(app.getHttpServer()).get('/').expect(404);
 });
 
-41. Conditionally loading enviroment
+41. Conditionally loading enviroment.
+    Los entornos condicionales son usados para distintos propositos, una forma de generalos podría ser así. Donde en el aspecto. envFilePath se pone la ruta condicional del env que queremos leer.
+
+const ENV = process.env.NODE_ENV;
+ConfigModule.forRoot({
+isGlobal: true,
+envFilePath: !ENV ? '.env' : `.env.${ENV}`,
+}),
+
+Por otro lado en el package.json podemos definir el valor de NODE_ENV.
+
+"start:dev": "cross-env NODE_ENV=develop
+ment nest start --watch",
+
+42. Config service y process. (Inject DB details)
+    En NestJS podés cargar variables de entorno de dos formas, pero hay una diferencia importante:
+
+process.env directamente → accedés a la variable de entorno de forma “plana”, como lo harías en cualquier proyecto de Node.js.
+
+username: process.env.DB_USER,
+password: process.env.DB_PASS,
+
+Esto funciona, pero no pasa por la configuración centralizada de Nest.
+
+ConfigService (usando @nestjs/config) → es la forma recomendada en NestJS porque:
+
+Te permite centralizar todas las variables.
+
+Podés validar las variables con schemas (por ejemplo con Joi).
+
+Es más fácil testear porque podés mockear el ConfigService.
+
+Ejemplo con ConfigService (recomendado):
+
+TypeOrmModule.forRootAsync({
+imports: [ConfigModule],
+inject: [ConfigService],
+useFactory: (config: ConfigService) => ({
+type: 'postgres',
+autoLoadEntities: true,
+synchronize: true,
+host: config.get<string>('DB_HOST'),
+port: config.get<number>('DB_PORT'),
+username: config.get<string>('DB_USER'),
+password: config.get<string>('DB_PASS'),
+database: config.get<string>('DB_NAME'),
+}),
+}),
+
+De esa forma, en tu .env tenés algo como:
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=nico5329
+DB_NAME=postgres
+
+👉 Resumen: sí podés usar process.env, pero en NestJS se recomienda ConfigService porque es más limpio, testeable y escalable.
+
+¿Querés que te muestre cómo agregar validación de variables con @nestjs/config + Joi para asegurarte que las del .env estén correctas al levantar la app?
+
+42.Customización de configuración.
+En proyectos más grandes se recomienda crear un archivo especial llamado appConfig donde se tendrán las variables de entorno centralizadas. Agrupa la configuración de distintos modulos en secciones claras, porque por ejemplo podemos tener muchos modulos o funcionalidades con diferentes variables de entorno. Permiten acceder a las variables de entorno con rutas más legibles.
+
+export const appConfig = () => ({
+enviroment: process.env.NODE_ENV || 'production',
+database: {
+host: process.env.DATABASE_HOST || 'localhost',
+port: parseInt(process.env.DATABASE_PORT || '5432'),
+user: process.env.DATABASE_USER,
+password: process.env.DATABASE_PASSWORD,
+name: process.env.DATABASE_NAME,
+synchronize: process.env.DATABASE_SYNC === 'true' ? true : false,
+aoutoLoadEntities: process.env.DATABASE_AUTOLOAD === 'true' ? true : false,
+},
+});
+
+para cada configuracion agragamos otra propiedad por ejemplo luego de la config de database, podríamos agregar de jwt o de cloudinary, etc.
+Luego para usarlo en el appModule, usamos la propiedad load que es capaz de cargar varias configuraciones.
+ConfigModule.forRoot({
+isGlobal: true,
+envFilePath: !ENV ? '.env' : `.env.${ENV}`,
+load: [appConfig],
+}),
+
+ahora para el modulo de typeOrm que se va a comunicar con la bd usamos el get con el objeto configurado y la obtencion de la propiedad.
+
+TypeOrmModule.forRootAsync({
+imports: [ConfigModule],
+inject: [ConfigService],
+useFactory: (configService: ConfigService) => ({
+type: 'postgres',
+// entities: [User, Post, MetaOption],
+autoLoadEntities: configService.get('database.aoutoLoadEntities'),
+synchronize: configService.get('database.synchronize'),
+host: configService.get('database.host'),
+port: configService.get('database.port'),
+username: configService.get('database.user'),
+password: configService.get('database.password'),
+database: configService.get('database.name'),
+// logging: true,
+}),
+}),
+],
+
+se ve como la obtención (get) es mucho más limpia.
+
+43. Register As
+
+Es una función de NestJS que sirve para registrar un conjunto de configuraciones con un nombre (namespace) dentro del ConfigModule.
+
+En otras palabras:
+
+Te permite darle un “nombre” a un grupo de variables.
+
+Permite acceder a ese grupo más fácilmente con configService.get('nombre.propiedad').
+
+Facilita tipado, modularidad y organización de las variables de entorno.
+Ejemplo simple
+
+// database.config.ts
+import { registerAs } from '@nestjs/config';
+
+export const databaseConfig = registerAs('database', () => ({
+host: process.env.DATABASE_HOST || 'localhost',
+port: parseInt(process.env.DATABASE_PORT || '5432'),
+}));
+
+ConfigModule.forRoot({
+isGlobal: true,
+envFilePath: !ENV ? '.env' : `.env.${ENV}`,
+load: [appConfig, databaseConfig],
+}),
+
+Luego, en cualquier parte de tu app:
+
+const dbHost = configService.get('database.host');
+const dbPort = configService.get('database.port');
+
+🔹 Lo que hace registerAs:
+
+Toma un nombre ('database').
+
+Toma una función que retorna un objeto con la configuración.
+
+Lo registra en ConfigModule bajo ese nombre.
+
+Esto evita tener un solo objeto gigante y te permite modularizar la configuración por áreas (database, app, auth, mail, etc.).
+
+44. Module configuration and Partial Registration.
+
+Hay ocasiones que la configuración de variables de entorno involucran a un solo modulo. Para esto puede ser necesario, que solo este modulo tenga y sea capaz de leer estas variables.
+
+Por ejemplo necesitamos que el modulo users obtenga un details de una api de google. El env se encontrara en un config en el modulo users
+
+A.se crea.
+
+import { registerAs } from '@nestjs/config';
+export default registerAs('profileConfig', () => ({
+apiKey: process.env.PROFILE_API_KEY,
+}));
+
+B.Se inyecta en el modulo con forFeature.
+
+@Module({
+controllers: [UsersController],
+providers: [UserService],
+imports: [
+forwardRef(() => AuthModule),
+TypeOrmModule.forFeature([User]),
+ConfigModule.forFeature(profileConfig),
+],
+exports: [UserService],
+})
+export class UsersModule {}
+
+C.Luego se inyecta en el servicio con @Inject(configProfile.KEY)
+se usa KEY que es la clave con la cual se reconoce el registerAs, en este caso "profileConfig".
+y se crea el valor para usar en el servicio con un tipo de configuracion private readonly profileConfiguration: ConfigType<typeof profileConfig>,
+
+constructor(
+@InjectRepository(User)
+private readonly usersRepository: Repository<User>,
+
+    @Inject(profileConfig.KEY)
+    private readonly profileConfiguration: ConfigType<typeof profileConfig>,
+
+)
+
+D. Luego se usa con this.profileConfiguration
+
+45. Validating enviroments variables.
+
+Usamos un package llamado joi
+npm i joI.
+
+Generará un schema de validación para las variables de entorno.
+Ejemplo:
+
+import \* as Joi from 'joi';
+
+export default Joi.object({
+NODE_ENV: Joi.string()
+.valid('development', 'test', 'production', 'staging')
+.default('development'),
+DATABASE_PORT: Joi.number().port().default(5432),
+PORT: Joi.number().port().default(3000),
+DATABASE_USER: Joi.string().required(),
+DATABASE_PASSWORD: Joi.string().required(),
+DATABASE_HOST: Joi.string().required(),
+DATABASE_NAME: Joi.string().required(),
+DATABASE_SYNC: Joi.boolean().required(),
+DATABASE_AUTOLOAD: Joi.boolean().required(),
+PROFILE_API_KEY: Joi.string().required(),
+});
+
+y al config module de app agregamos esta validación de schema con validationSchema
+
+ConfigModule.forRoot({
+isGlobal: true,
+envFilePath: !ENV ? '.env' : `.env.${ENV}`,
+load: [appConfig, databaseConfig],
+validationSchema: enviromenValidation,
+}),
+
+Entonces al momento inicializar si existe algun error en las varibales detalla el error.
