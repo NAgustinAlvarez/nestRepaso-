@@ -1003,3 +1003,78 @@ validationSchema: enviromenValidation,
 }),
 
 Entonces al momento inicializar si existe algun error en las varibales detalla el error.
+
+46. Exception Handling.
+    Las excepciones son casi siempre necesarias en casos de comunicación con la bd y el chequeo de datos únicos.
+
+Forma general de las excepciones:
+throw new HttpException(response, status)
+
+a.un mensaje principal (string o un objeto),
+
+b.y opcionalmente, un objeto con metadatos adicionales.
+🧩 Qué hace cada parte
+1️⃣ 'Unable to process your request at the moment please try later'
+
+Este es el mensaje principal que se incluirá en la respuesta JSON.
+Sirve para decirle al cliente qué pasó, en este caso:
+
+“No se pudo procesar tu solicitud en este momento, por favor intentá más tarde”.
+
+2️⃣ { description: 'Error connecting to the database' }
+
+Este es un objeto de contexto adicional que Nest incluye en la respuesta.
+No es obligatorio, pero podés usarlo para describir dónde o por qué ocurrió el error.
+Por ejemplo, si el error fue de conexión a la base de datos.
+
+Esto se traduce a una respuesta JSON parecida a:
+
+{
+"statusCode": 408,
+"message": "Unable to process your request at the moment please try later",
+"error": "Request Timeout",
+"description": "Error connecting to the database"
+}
+
+Aunque es recomendado utilizar las excepciones predefinidas por nestjs ya que devuelven un objeto más consistente, en caso de que tengamos muchos exceptions.
+
+Ejemplo: en el service de user tenemos que para crear un usuario se busca en la bd para ver si ya existe el email. Ahí podemos tener dos excepciones. 1 error al buscar en la bd 2. Ya existe un mail igual en la bd.
+
+async createUser(createUserDto: CreateUserDto) {
+let existingUser;
+try {
+//Check if the user exist with same mail
+existingUser = await this.usersRepository.findOne({
+where: { email: createUserDto.email },
+});
+} catch (error) {
+//Aquí se estaría dando un error en la db y es posible que se guarde el error si quisieramos en la db o se mande un mensaje de donde se origina el error.
+
+      throw new RequestTimeoutException(
+        'Unable to procces your request at the moment pleas try later',
+        { description: 'Error connecting to the database' },
+      );
+    }
+
+    //Handle exception}
+    if (existingUser) {
+      throw new BadRequestException(
+        'The user already exists, please check your email',
+        {},
+      );
+    }
+    //Create new user
+    let newUser = this.usersRepository.create(createUserDto);
+    newUser = await this.usersRepository.save(newUser);
+
+}
+
+Ahora en la solicitud si hay un email igual la respuesta será {
+"message": "The user already exists, please check your email",
+"statusCode": 400
+}
+en el catch tenemos que si no puede conectarse a la db lance un error. Para probar esto podemos detener postgre desde powerShell y enviar la solicitud.
+
+comandos para detener e iniciar postgre v15
+net stop postgresql-x64-15
+net start postgresql-x64-15

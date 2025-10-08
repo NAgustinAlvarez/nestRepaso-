@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  forwardRef,
+  RequestTimeoutException,
+  BadRequestException,
+} from '@nestjs/common';
 import { GetUsersParamDto } from '../dtos/get-user.dto';
 import { AuthService } from 'src/auth/providers/auth.service';
 import { Repository } from 'typeorm';
@@ -24,12 +30,28 @@ export class UserService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto) {
-    //Check if the user exist with same mail
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: createUserDto.email },
-    });
-    //Handle exception}
+    let existingUser;
+    try {
+      //Check if the user exist with same mail
+      existingUser = await this.usersRepository.findOne({
+        where: { email: createUserDto.email },
+      });
+    } catch (error) {
+      //Aquí se estaría dando un error en la db y es posible que se guarde el error si quisieramos en la db o se mande un mensaje de donde se origina el error.
 
+      throw new RequestTimeoutException(
+        'Unable to procces your request at the moment pleas try later',
+        { description: 'Error connecting to the database' },
+      );
+    }
+
+    //Handle exception}
+    if (existingUser) {
+      throw new BadRequestException(
+        'The user already exists, please check your email',
+        {},
+      );
+    }
     //Create new user
     let newUser = this.usersRepository.create(createUserDto);
     newUser = await this.usersRepository.save(newUser);
