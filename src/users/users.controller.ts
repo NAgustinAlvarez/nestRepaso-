@@ -55,11 +55,11 @@ export class UsersController {
     example: 1,
   })
   getUsers(
-    @Param() getUserParamDto: number,
+    @Param('id', ParseIntPipe) id: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
-    return this.userService.findOneById(getUserParamDto);
+    return this.userService.findOneById(id);
   }
   @Post()
   createUsers(@Body() createUserDto: CreateUserDto) {

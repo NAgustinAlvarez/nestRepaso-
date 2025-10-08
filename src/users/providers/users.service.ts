@@ -6,6 +6,8 @@ import {
   forwardRef,
   RequestTimeoutException,
   BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { GetUsersParamDto } from '../dtos/get-user.dto';
 import { AuthService } from 'src/auth/providers/auth.service';
@@ -15,6 +17,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { ConfigService, ConfigType } from '@nestjs/config';
 import profileConfig from '../config/profile.config';
+import { FetchUserDto } from '../dtos/fetch-user.dto';
 @Injectable()
 export class UserService {
   constructor(
@@ -54,7 +57,11 @@ export class UserService {
     }
     //Create new user
     let newUser = this.usersRepository.create(createUserDto);
-    newUser = await this.usersRepository.save(newUser);
+    try {
+      newUser = await this.usersRepository.save(newUser);
+    } catch (error) {
+      throw new InternalServerErrorException('Internal server error');
+    }
   }
   getUsers(): string {
     return 'this is a users service';
@@ -74,6 +81,17 @@ export class UserService {
   }
 
   async findOneById(id: number) {
-    return await this.usersRepository.findOneBy({ id });
+    let user: FetchUserDto | null;
+    try {
+      user = await this.usersRepository.findOneBy({ id });
+    } catch (error) {
+      //solo errores de la db
+      throw new RequestTimeoutException();
+    }
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
   }
 }
