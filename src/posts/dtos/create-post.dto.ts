@@ -1,9 +1,9 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsDate,
   IsEnum,
   IsInt,
-  IsISO8601,
   IsJSON,
   IsNotEmpty,
   IsOptional,
@@ -101,7 +101,8 @@ export class CreatePostDto {
     description: 'Optional publish date in ISO 8601 format',
     example: '2025-09-01T12:00:00.000Z',
   })
-  @IsISO8601()
+  @Type(() => Date)
+  @IsDate()
   @IsOptional()
   publishOn?: Date;
 

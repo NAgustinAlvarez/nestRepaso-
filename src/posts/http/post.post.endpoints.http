@@ -1,9 +1,9 @@
 POST http://localhost:3000/posts 
 Content-Type: application/json
 {
-  "title": "Mi primer post",
+  "title": "Mi primer post Valentina",
   "postType": "post",
-  "slug": "mi-primer-post220",
+  "slug": "mi-primer-post225",
   "status": "draft",
   "content": "Este es el contenido del post.",
   "schema": "{\"type\":\"object\",\"properties\":{\"example\":{\"type\":\"string\"}}}",
@@ -13,6 +13,6 @@ Content-Type: application/json
 "metaOptions": {
     "metaValue": "{\"sidebarEnabled\": true, \"footerActive\": true}"
   },
-  "authorId": 1,
+  "authorId": 15,
   "tags": [1]
 }

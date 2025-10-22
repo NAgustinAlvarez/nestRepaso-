@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable } from '@nestjs/common';
+import { Injectable, RequestTimeoutException } from '@nestjs/common';
 
 import { Tag } from '../tag.entity';
 import { In, Repository } from 'typeorm';
@@ -11,14 +11,19 @@ export class TagsService {
   constructor(
     @InjectRepository(Tag) private readonly tagsRepository: Repository<Tag>,
   ) {}
+
   async create(createTagDto: CreateTagDto) {
     const tagg = this.tagsRepository.create(createTagDto);
     return await this.tagsRepository.save(tagg);
   }
+
   async findMultipleTags(tags: number[]) {
-    const result = await this.tagsRepository.find({ where: { id: In(tags) } });
+    const result = await this.tagsRepository.find({
+      where: { id: In(tags) },
+    });
     return result;
   }
+
   async delete(id: number) {
     await this.tagsRepository.delete(id);
 

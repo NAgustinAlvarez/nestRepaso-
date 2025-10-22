@@ -1,1 +1,21 @@
-GET http://localhost:3000/posts/11
+//primera forma del get con date estático
+GET http://localhost:3000/posts?startDate=2025-10-12&endDate=2025-10-13&limit=4&page=1
+
+
+
+// segunda, dinamica
+{{ 
+  // Pre-request script
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 1);
+  
+  // Usar process.env si httpYac lo soporta
+  process.env.START_DATE = startDate.toISOString().split('T')[0];
+  process.env.END_DATE = endDate.toISOString().split('T')[0];
+}}
+
+GET http://localhost:3000/posts/11?startDate={{process.env.START_DATE}}&endDate={{process.env.END_DATE}}&limit=1&page=3
+
+
+

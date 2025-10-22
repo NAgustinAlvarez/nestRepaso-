@@ -23,6 +23,38 @@ Normalmente, ahí va el código para crear, leer, actualizar o eliminar datos (C
 
 -Spec para testear. Ej: users.controller.spec.ts
 
+3.a\*- Diferenciación módulos, Helpers estáticos.
+(ej pagination tiene un modulo por utilizar repositorios en el servicio)
+Modulos características:
+
+✅ NestJS instancia automáticamente los servicios (@Injectable).
+✅ Permite inyección de dependencias (DI).
+✅ Organiza y comparte lógica entre módulos.
+❌ Más formal, se usa cuando hay dependencias o lógica reutilizable.
+Si tu servicio usa repositorios u otros providers, siempre conviene @Injectable() + módulo para aprovechar DI.
+
+HELPERS ESTÁTICOS (por ejemplo: error.service.ts)
+Qué son
+Son clases o funciones comunes que no dependen del contenedor de NestJS.
+No necesitan inyección ni módulo: las llamás directamente.
+
+export class DatabaseErrorService {
+static throwError(action: string): never {
+throw new Error(`Error while ${action}`);
+}
+}
+O incluso una función común:
+export function formatDate(date: Date) {
+return date.toISOString();
+}
+
+Características:
+
+✅ Se usan directamente, sin @Injectable() ni módulo.
+✅ Simples, rápidas, sin dependencias.
+❌ No se pueden inyectar (sin DI).
+❌ No podés usar servicios de NestJS adentro.
+
 4- Nest Cli:
 \*nest --help .Contiene todos los comandos del cli de nest para generar recursos.
 
@@ -163,7 +195,9 @@ app.useGlobalPipes(
 new ValidationPipe({
 whitelist: true, //elimina cualquier propiedad que no esté en el dto
 forbidNonWhitelisted: true, //lanza error si hay alguna propiedad que no esté en el dto
-transform: true, //transforma a los tipos de datos definidos en el dto si es posible, además transforma el objeto que viene a un tipo de objeto igual al DTO. Es importante por seguridad.
+transform: true, //transforma a los tipos de datos definidos al dto definidi si es posible. Es importante por seguridad.
+transformOptions: { enableImplicitConversion: true }, // es un opción de class-transformer que se pasa cuando transform: true.
+Permite la conversión automática de tipos primitivos aunque no uses decoradores explícitos como @Type().
 }),
 );
 await app.listen(process.env.PORT ?? 3000);
@@ -191,6 +225,41 @@ import { CreateUserDto } from './create-user.dto';
 export class UpdateUserDto extends PartialType(CreateUserDto) {}
 
 otros: OmitType para excluir ciertos campos como password, PickType para crear un DTO con algunos campos seleccionados de otro DTO.
+
+Otro util es IntersectionType para combinar dos types. por ejemplo en este, PaginationQueryDto y GetPostBaseDto:
+
+import { Type } from 'class-transformer';
+import { IsOptional, IsPositive } from 'class-validator';
+
+export class PaginationQueryDto {
+@IsOptional()
+@IsPositive()
+@Type(() => Number)
+limit?: number;
+
+@IsOptional()
+@IsPositive()
+@Type(() => Number)
+page?: number;
+}
+
+import { IsDate, IsOptional } from 'class-validator';
+import { IntersectionType } from '@nestjs/swagger';
+import { PaginationQueryDto } from 'src/common/pagination/dtos/pagination-query.dto';
+class GetPostBaseDto {
+@IsDate()
+@IsOptional()
+startDate?: Date;
+
+@IsDate()
+@IsOptional()
+endDate?: Date;
+}
+
+export class GetPostDto extends IntersectionType(
+GetPostBaseDto,
+PaginationQueryDto,
+) {}
 
 15: Dependency injection.
 
@@ -671,7 +740,8 @@ No se debe aclarar como en otros casos el cascade.
 
     ConfigModule.forRoot({ isGlobal: true })
 
-    Luego para usarlo por ejemplo en un servicio.
+    Luego para usarlo por ejemplo en un servicio (en user.service.ts).
+
     private readonly configService: ConfigService, en el constructor, importamos el service del config y por ejemplo para obtener las variables almacenadas se pone la clave y un metodo.
 
     findAll(limit: number, page: number) {
@@ -1051,7 +1121,7 @@ where: { email: createUserDto.email },
 //Aquí se estaría dando un error en la db y es posible que se guarde el error si quisieramos en la db o se mande un mensaje de donde se origina el error.
 
       throw new RequestTimeoutException(
-        'Unable to procces your request at the moment pleas try later',
+        'Unable to procces your request at the moment please try later',
         { description: 'Error connecting to the database' },
       );
     }
@@ -1078,3 +1148,605 @@ en el catch tenemos que si no puede conectarse a la db lance un error. Para prob
 comandos para detener e iniciar postgre v15
 net stop postgresql-x64-15
 net start postgresql-x64-15
+
+47. Custom exceptions.
+    Es recomendado utilizar las de nest porque tendríamos respuestas más consistentes en todo el proyecto, pero en ocasiones puede ser útil el uso de estos, manteniendo la consistencia.
+
+\*Se lanza un httpException que contendrá dos o más valores, el primero debe ser un objeto con el estatus y otros campos que podrían ser relevantes, el segundo argumento debe de ser el codigo de error, status. Y el tercero son las opciones que no serán mostradas como respuesta.
+findAll(limit: number, page: number) {
+
+    throw new HttpException(
+      {
+        status: HttpStatus.MOVED_PERMANENTLY,
+        error: 'The API endopint does not exist',
+        filename: 'user.service.ts',
+        linenumber: 84,
+      },
+      HttpStatus.MOVED_PERMANENTLY,
+      {
+        cause: new Error(),
+        description: 'Occured because the API endpoint was permantly moved',
+      },
+    );
+
+}
+
+48. Transactions.
+    Las transacciones son operaciones multiples que se generan en un proceso. Si una de esas operaciones resulta fallida se hace un rollback de todas las operaciones y se vuelve al estado inicial.
+    Este tipo de operaciones es necesaria cuando se necesitan hacer varias operaciones.
+    EJ: operación bancaria en tres pasos para la transferencia de dinero.
+
+a.Se chequea el saldo de la cuenta.
+b.Se debita el saldo de la transferencia.
+c.Se acredita a otra cuenta.
+
+Si alguno de estos pasos arroja un error se vuelve al estado inicial.
+
+En typeOrm las transacciones se usan con la clase queryRunner. Cuando se hace uso del queryRunner se hace una conexión unica con la pool connection(conexiones disponibles con la bd). Para generar esta conexión hay una serie de pasos.
+
+a. connect() para conectar con la db
+b. starTransaction() para comenzar la transaccion
+c. operaciones...
+d. try catch block - si es exitosa commitTransaction() genera un commit - si no es exitosa rollbackTransaction() vuelve todo atrás
+c. release() libera la conexión
+
+Ej de operación completa. con detalles (userService.ts) para crear varios usuarios.
+
+constructor(
+// usa el modulo DataSource para la transacción
+private readonly dataSource: DataSource,
+) {}
+
+public async createMany(createUsersDto: CreateUserDto[]) {
+//crea un array para guardar los usuarios creados, inicialmente vacio.
+
+    let newUsers: User[] = [];
+
+    //Create Query Runner Instance
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    //Connect Query Runner to datasource
+    await queryRunner.connect();
+
+    //Start transaction
+    await queryRunner.startTransaction();
+
+    //try catch para hacer un commit o rollback
+    try {
+
+        //ciclo for of para declarar user por cada objeto en el array createUserDto
+      for (let user of createUsersDto) {
+        //para crear y manejar datos se usa la propiedad manager
+        //se crea una instancia de la clase
+        let newUser = queryRunner.manager.create(User, user);
+        //se guarda en la db, no definitivamente
+        let result = await queryRunner.manager.save(newUser);
+        //se pushea al array inicialmente vacio
+        newUsers.push(result);
+
+      }
+       //If succesful commit
+        await queryRunner.commitTransaction();
+        //retorno para confirmación
+      return newUsers;
+    } catch (error) {
+      //If unseccesful rollback
+      await queryRunner.rollbackTransaction();
+    } finally {
+      //Release connection
+      await queryRunner.release();
+    }
+
+}
+
+49. Creación de multiples proveedores(servicios)
+    Cuando nuestros servicios crecen demasiados el código puede llegar a ser ilegible. Por eso es necesarios crear diferentes proveedores. Reglas generales para cuando conviene crear nuevos proveedores:
+
+🔹 Cuando el servicio tiene responsabilidades distintas → por ejemplo, separar la lógica de transacciones o notificaciones del CRUD principal.
+
+🔹 Cuando el servicio se vuelve muy grande o complejo → si tiene muchos métodos o mezcla distintas tareas, conviene dividirlo.
+
+🔹 Cuando cierta lógica puede reutilizarse en otros módulos → como un EmailService o FileService.
+
+🔹 Cuando querés aislar código de infraestructura → como manejo de base de datos, colas o transacciones (QueryRunner, etc.).
+
+🔹 Cuando querés mejorar la testabilidad → separar partes hace más fácil probarlas individualmente.
+
+a.Crear provider con cli.
+
+nest g pr user/providers/users-create-many.provider --flat --no-spec
+
+b. Una vez creado el injectable lo llamamos en el service con el constructor con private readonly. Luego lo utilizamos retornandoló.
+
+En este caso user.service usa users-create-many.provider para la operación multiple con el queryRunner para que no quede tan cargado el servicio original.
+
+en este tipo de opereaciones en los que vamos a mandar un array de objetos es necesario validar todos los objetos dentro del array por eso es necesario agregar otro dto porque no basta solo con poner [] luego de dto singulares ya definidos.
+Por ejemplo para enviar varios usuarios el nuevo dto es:
+export class CreateManyUsersDto {
+@ApiProperty({ type: 'array', required: true, items: { type: 'User' } })
+@IsNotEmpty()
+@IsArray()
+@ValidateNested({ each: true })
+@Type(() => CreateUserDto)
+users: CreateUserDto[];
+}
+
+51. Pagination.
+
+El paginado es una practica común en el backend de varios servicios. Comunmente para un selector de paginado tipo así
+⏮ ‹ 1 2 [3] 4 5 › ⏭
+se retorna algo así:
+{
+"data": [], // Array of Posts
+"meta": {
+"itemsPerPage": 1,
+"totalItems": 4,
+"currentPage": 1,
+"totalPages": 4
+},
+"links": {
+"first": "http://localhost:3000/posts/?limit=1&page=1",
+"last": "http://localhost:3000/posts/?limit=1&page=4",
+"current": "http://localhost:3000/posts/?limit=1&page=1",
+"next": "http://localhost:3000/posts/?limit=1&page=2",
+"previous": "http://localhost:3000/posts/?limit=1&page=1"
+}
+}
+
+Para definir la respuesta o el return que vamos a obtener recordá que se definen las interfaces por ejemplo:
+
+interface User {
+id: number;
+name: string;
+age: number;
+}
+
+const user: User = {
+id: 1,
+name: 'Nico',
+// age falta
+};
+
+function getUserInfo(userId: number): User {
+const dbResult = {
+id: userId,
+name: 'Nico',
+// age falta
+};
+
+return dbResult; // ❌ TypeScript da error: Property 'age' is missing
+}
+
+52.Creación Pagination genérico.
+(pagination.provider y module)
+El objetivo es crear un servicio genérico ya que es una función que comunmente se utiliza en varios lugares de servicio.
+
+En paginador del proyecto creamos un modulo con un provider ya que utiliza repositorios(genéricos) y por buenas practicas de nest es necesario generar un modulo.
+
+@Injectable()
+export class PaginationProvider {
+public async paginatedQuery<T extends ObjectLiteral>(
+paginationQuery: PaginationQueryDto,
+repository: Repository<T>,
+) {
+paginationQuery.page = paginationQuery.page ?? 1;
+paginationQuery.limit = paginationQuery.limit ?? 5;
+const results = await repository.find({
+skip: (paginationQuery.page - 1) _ paginationQuery.limit, //(first page - 1) _ limit
+take: paginationQuery.limit,
+});
+return results;
+}
+}
+
+//<T extends ObjectLiteral> permite aplicar cualquier objeto clave valor
+// PaginationQueryDto, page y limit
+//Repository<T> forma genérica utilizada para reutilizar
+
+@Module({ providers: [PaginationProvider], exports: [PaginationProvider] })
+export class PaginationModule {}
+
+Luego lo importamos y lo ponemos en el constructor del nuevo servicio.
+
+53.Response Object for pagination.
+
+Siguiendo con el paginado necesitamos que este nos de una respuesta con la forma escrita en el punto 51. Para esto uno de los puntos necesarios es la creación de urls para el salto entre paginas.
+
+Para lograr esto hacemos uso de las request tanto @Request(que se usa en controladores) y REQUEST para servicios y providers. En nuestro provider de pagination.
+
+🟩 1. @Request() — en controladores
+
+Es un decorador de @nestjs/common.
+Se usa cuando estás dentro de un controller o un handler (un método que maneja una ruta).
+
+Ejemplo:
+
+import { Controller, Get, Request } from '@nestjs/common';
+
+@Controller('users')
+export class UserController {
+@Get()
+getUser(@Request() req) {
+console.log(req.user);
+return req.user;
+}
+}
+
+👉 Es ideal para rutas HTTP porque Nest te inyecta automáticamente el objeto req (de Express o Fastify).
+⚙️ No necesitás inyección de dependencias.
+
+🟨 2. REQUEST — en providers o servicios
+
+Es un token de inyección del paquete @nestjs/core.
+Se usa cuando no estás en un controlador, por ejemplo en un service o guard, y necesitás acceder a la request actual.
+
+Ejemplo:
+
+import { Injectable, Inject, Scope } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+
+@Injectable({ scope: Scope.REQUEST })
+export class UserService {
+constructor(@Inject(REQUEST) private readonly request: Request) {}
+
+getCurrentUser() {
+return this.request.user;
+}
+}
+
+El obejto de nuestro paginade devuelve la data, metaDatos de paginado y firs, last, current, next, previous pages con los links pertinentes.
+Para construir estos links dinamicamente en pagination.provider.ts:
+
+a.Inyectamos el Request:
+@Inject(REQUEST)
+private readonly request: Request.
+
+b.Creamos la url dinamicamente con ayuda de este modulo.
+/\*\*
+_ Create the request URLS
+_/
+const baseURL =
+this.request.protocol + '://' + this.request.headers.host + '/';
+const newUrl = new URL(this.request.url, baseURL);
+console.log(newUrl);
+
+1️⃣ this.request.protocol + '://' + this.request.headers.host + '/' es como: http+://+localhost:3000/
+
+2️⃣ new URL(this.request.url, baseURL)
+
+Aquí se está creando un objeto URL de JavaScript, que nos permite trabajar fácilmente con URLs completas.
+
+this.request.url → contiene solo la ruta y query string de la petición, por ejemplo "/users?page=2".
+
+baseURL → es la base que construimos antes ("http://localhost:3000/").
+
+new URL(this.request.url, baseURL) combina ambos y genera:
+
+URL {
+href: 'http://localhost:3000/users?page=2',
+origin: 'http://localhost:3000',
+pathname: '/users',
+search: '?page=2',
+...
+}
+
+Con este objeto URL ya puedes acceder fácilmente a partes del URL como:
+
+.pathname → '/users'
+
+.search → '?page=2'
+
+.origin → 'http://localhost:3000'
+
+.href → 'http://localhost:3000/users?page=2'
+
+De esa forma luego se puede implementar la logica de paginado que se datalla en el codigo del provider.
+
+54.User Authentication.
+
+Generalmente para guardar usuarios las contraseñas se hashean a través de algoritmos. Y siempre, que se quiera acceder con el mismo usuario, esta password será verificada de nuevo por el algoritmo para chequear la igualdad.
+Adding salt a un hash es agregar más caracteres aleatorios para complicar el acceso al descifrado de la password.
+
+Para empezar vamos a generar dos providers. Hashing provider y bcrypt provider, separarlos en dos es para que en caso de que en el futuro se quiera usar otra libreria se podrá cambiar más facilmente.
+
+$ nest g pr auth/providers/hashing.provider.ts --flat --no-spec
+$ nest g pr auth/providers/bcrypt.provider --flat --no-spec
+
+52. Abstract y uso en authModule.
+
+Las interfaces abstractas son como moldes que serán utilizados por proveedores. La interfaz define las funciones o el molde general y el proveedor define que ira dentro de ese molde.
+
+Cuando marcás una clase como **abstract**, significa que no puede ser instanciada directamente, sino que sirve como plantilla o contrato para otras clases.
+
+En el ejemplo:
+
+export abstract class HashingProvider {
+abstract hashPassword(data: string | Buffer): Promise<string>;
+abstract comparePassword(
+data: string | Buffer,
+encrypted: string,
+): Promise<boolean>;
+}
+
+Esta clase dice:
+
+“Cualquier clase que herede de mí debe implementar estos dos métodos (hashPassword y comparePassword).”
+
+Pero no dice cómo hacerlo —eso lo decide cada clase concreta (como BcryptProvider).
+
+💥 Por qué es útil
+
+Esto se usa mucho en NestJS para definir interfaces de comportamiento entre proveedores.
+Por ejemplo:
+
+HashingProvider define qué hay que hacer (hash y comparar contraseñas).
+
+BcryptProvider define cómo se hace (usando bcrypt).
+
+Si después querés cambiar a Argon2 o SHA-256, podés crear otro proveedor que implemente HashingProvider sin cambiar el resto del código.
+
+🧩 Ejemplo más realista
+@Injectable()
+export class BcryptProvider extends HashingProvider {
+async hashPassword(data: string | Buffer): Promise<string> {
+return await bcrypt.hash(data.toString(), 10);
+}
+
+async comparePassword(data: string | Buffer, encrypted: string): Promise<boolean> {
+return await bcrypt.compare(data.toString(), encrypted);
+}
+}
+
+Y luego en tu servicio podrías inyectar el HashingProvider sin importar cuál sea la implementación real:
+
+@Injectable()
+export class UsersService {
+constructor(private readonly hashingProvider: HashingProvider) {}
+
+async createUser(password: string) {
+const hashed = await this.hashingProvider.hashPassword(password);
+// guardar el usuario con su contraseña hasheada
+}
+}
+
+Así, si un día querés usar otra librería, solo cambiás el provider en tu módulo, no todo tu código.
+
+flujo de ejemplo:
+
+UsersModule
+↓
+UsersService
+↓
+HashingProvider (abstracto)
+↓
+BcryptProvider (implementación concreta)
+
+luego para exportarlo desde el módulo de hashing o auth(auth.module.ts)
+
+Ejemplo con hashingModule:
+@Module({
+providers: [
+{
+provide: HashingProvider, // contrato abstracto
+useClass: BcryptProvider, // implementación concreta
+},
+],
+exports: [HashingProvider], // exportás el contrato para que otros módulos puedan usarlo
+})
+export class HashingModule {}
+
+53.Bcrypt.
+npm i bcrypt@5.1.1
+
+export class BcryptProvider implements HashingProvider {
+async hashPassword(data: string | Buffer): Promise<string> {
+/**
+_ Generate Salt
+_/
+const salt = await bcrypt.genSalt();
+return bcrypt.hash(data, salt);
+}
+comparePassword(
+data: string | Buffer,
+encrypted: string,
+): /**
+
+- Compare
+  \*/
+  Promise<boolean> {
+  return bcrypt.compare(data, encrypted);
+  }
+  }
+
+🧩 1. Qué pasa cuando se crea una contraseña
+
+Cuando ejecutás:
+
+const salt = await bcrypt.genSalt();
+const hash = await bcrypt.hash(password, salt);
+
+bcrypt hace esto internamente:
+
+Genera un “salt” — una cadena aleatoria que se usará para hacer único el hash.
+Ejemplo:
+
+$2b$10$U8s7B3QZm9v4Jsl9jGnOqe
+
+$2b$ → versión del algoritmo.
+
+10 → costo (número de rondas).
+
+El resto es el salt.
+
+Combina la contraseña + el salt, y aplica el algoritmo de hashing de bcrypt (que es más complejo que un simple SHA).
+Así genera algo como:
+
+$2b$10$U8s7B3QZm9v4Jsl9jGnOqe5cDLK6jh1dFQrkf0fJ3b3K2S5Bfpq.e
+
+Este valor incluye dentro de sí mismo el salt y el costo, por eso después no hace falta guardarlos por separado.
+
+🔐 2. Cómo bcrypt compara contraseñas
+
+Cuando más tarde el usuario inicia sesión y vos hacés:
+
+bcrypt.compare(plainPassword, hashedPassword)
+
+bcrypt hace esto internamente:
+
+Extrae el salt y el costo del hash almacenado (hashedPassword).
+
+Hashea la contraseña en texto plano (plainPassword) usando ese mismo salt y costo.
+
+Compara ambos hashes — si son iguales, devuelve true; si no, false.
+
+Por eso vos nunca tenés que preocuparte por guardar o pasar el salt.
+El hash ya lo contiene.
+
+Y el flujo sería:
+
+// 1️⃣ Cuando el usuario se registra:
+const hashedPassword = await bcryptProvider.hashPassword('miContraseña123');
+// Guardás hashedPassword en la DB
+
+// 2️⃣ Cuando inicia sesión:
+const isMatch = await bcryptProvider.comparePassword('miContraseña123', hashedPassword);
+
+if (isMatch) {
+console.log('Contraseña correcta ✅');
+} else {
+console.log('Contraseña incorrecta ❌');
+}
+
+54.User signUp.
+Para registrarse se usará el servicio de en authmodule y para signIn authModule hará uso de useService, entonces se injectan en forma de dependencia circular con forwardRef para que no arroje error. En el proyecto la creación de usuarios tendrá un provider separado dentro usersModule para hacer legible el userService, este último tendrá un metodo que usa este provider.
+
+@Injectable()
+export class CreateUserProvider {
+constructor(
+/\*\*
+_ Inject userRepository
+_/
+@InjectRepository(User)
+private readonly usersRepository: Repository<User>,
+
+    /**
+     * Inject hashing provider
+     */
+    @Inject(forwardRef(() => HashingProvider))
+    private readonly hashingProvider: HashingProvider,
+
+) {}
+
+async createUser(createUserDto: CreateUserDto) {
+let existingUser;
+try {
+//Check if the user exist with same mail
+existingUser = await this.usersRepository.findOne({
+where: { email: createUserDto.email },
+});
+} catch (error) {
+//Aquí se estaría dando un error en la db y es posible que se guarde el error si quisieramos en la db o se mande un mensaje de donde se origina el error.
+
+      throw new RequestTimeoutException(
+        'Unable to procces your request at the moment please try later',
+        { description: 'Error connecting to the database' },
+      );
+    }
+
+    //Handle exception}
+    if (existingUser) {
+      throw new BadRequestException(
+        'The user already exists, please check your email',
+        {},
+      );
+    }
+
+    //Create new user
+    let newUser = this.usersRepository.create({
+      ...createUserDto,
+      password: await this.hashingProvider.hashPassword(createUserDto.password),
+    });
+
+    try {
+      newUser = await this.usersRepository.save(newUser);
+      return newUser;
+    } catch (error) {
+      throw new RequestTimeoutException(
+        'Unable to procces your request at the moment please try later',
+        { description: 'Error connecting to the database' },
+      );
+    }
+
+}
+}
+
+lo único diferente es que en la creación de usuario la contraseña se hashea.
+
+55.SignIn Controller. (find-one-user-by-email.provider)
+$ nest g pr users/providers/find-one-user-by-email.provider --flat --no-spec
+
+Generamos un provider para encontrar usuario con email. Lo agregamos en userService y lo usamos en el AuthService.
+Esta gerarquización es una buena practica y mantiene todo ordenado.
+Los archivos son find-one-user-by-email.provider busca usuario, se injecta en user.service -> luego authService confirma usuario y da dato booleano.
+
+56.Completing sigIn Method.
+
+Creamos un provider llamado sign-in.provider
+$ nest g pr auth/providers/sign-in.provider --flat --no-spec
+
+ponemos la logica de signIn ahí, luego inyectamos en authservice.
+
+Puntos destacables:
+a. Comparación de hash y password.
+isEqual = await this.hashingProvider.comparePassword(
+signInDto.password,
+user?.password,
+);
+
+b. Modificación de respuesta en controlador de 201 created (respuesta predefinidad por POST) a 200 OK. con decorador.
+@Post('sign-in')
+@HttpCode(HttpStatus.OK)
+async signIn(@Body() signInDto: SignInDto) {
+return await this.authService.signIn(signInDto);
+}
+
+57. JWT
+    Es un sistema para que el usuario se mantenga logeado, permitiendo hacer consultas sin tener que repetir el proceso.
+    Como respuesta a un login correcto el backend envía el jwt que se guardará en el front para luego ser mandado en cada consulta hacia el back por lo general en el header.
+    Authorization: Bearer <token>
+
+npm i @nestjs/jwt
+
+Entonces el jwt se devolverá cada que el usuario haga login.
+
+Dentro de las configuraciónes tendremos que crear variables de entorno para chequear la veracidad de generación del token.
+
+JWT_SECRET=
+JWT_TOKEN_AUDIENCE=
+JWT_TOKEN_ISSUER=
+JWT_ACCES_TOKEN_TTL=
+
+JWT_SECRET
+//podemos sacarla de alguna web de generado de codigo.
+🔹 Significado: Clave usada para firmar y verificar el token.
+
+🔹 Ejemplo: mi_clave_super_segura
+
+JWT_TOKEN_AUDIENCE
+
+🔹 Significado: Público destinatario del token (quién debería usarlo).
+
+🔹 Ejemplo: https://nicolas-app.com
+
+JWT_TOKEN_ISSUER
+
+🔹 Significado: Identifica quién emitió el token (el emisor).
+
+🔹 Ejemplo: nest-backend
+
+JWT_ACCESS_TOKEN_TTL
+
+🔹 Significado: Tiempo de vida del token en segundos (cuánto dura antes de expirar).
+
+🔹 Ejemplo: 3600

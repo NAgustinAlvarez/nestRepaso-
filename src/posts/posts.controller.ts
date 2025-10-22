@@ -16,6 +16,7 @@ import { UserService } from 'src/users/providers/users.service';
 import { GetUsersParamDto } from 'src/users/dtos/get-user.dto';
 import { CreatePostDto } from './dtos/create-post.dto';
 import { PatchPostDto } from './dtos/patch-post.dto';
+import { GetPostDto } from './dtos/get-post.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -24,9 +25,21 @@ export class PostsController {
     private readonly userService: UserService,
   ) {}
 
-  @Get('/:id')
-  getPost(@Param('id', ParseIntPipe) userId: number) {
-    return this.postsService.findAll(userId);
+  @Get()
+  getPost(
+    @Query() postQuery: GetPostDto, //con startData, endDate, limit y page
+  ) {
+    console.log(postQuery);
+    return this.postsService.findAll(postQuery);
+  }
+
+  @Get('/:userId')
+  getPostUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query() postQuery: GetPostDto, //con startData, endDate, limit y page
+  ) {
+    console.log(postQuery);
+    return this.postsService.findAll(postQuery, userId);
   }
 
   @Post()
