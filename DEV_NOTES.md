@@ -1683,7 +1683,9 @@ where: { email: createUserDto.email },
 
 lo único diferente es que en la creación de usuario la contraseña se hashea.
 
-55.SignIn Controller. (find-one-user-by-email.provider)
+55.SignIn Controller en UserModule para AuthModule, luego token.
+
+(find-one-user-by-email.provider)
 $ nest g pr users/providers/find-one-user-by-email.provider --flat --no-spec
 
 Generamos un provider para encontrar usuario con email. Lo agregamos en userService y lo usamos en el AuthService.
@@ -1750,3 +1752,132 @@ JWT_ACCESS_TOKEN_TTL
 🔹 Significado: Tiempo de vida del token en segundos (cuánto dura antes de expirar).
 
 🔹 Ejemplo: 3600
+
+Para obtener las variables de entorno podemos agregarlas a una configuración para modulo especifico. (jwt.config)
+export default registerAs('jwt', () => {
+return {
+secret: process.env.JWT_SECRET,
+audience: process.env.JWT_AUDIENCE,
+issuer: process.env.JWT_ISSUER,
+accessTokenTtl: parseInt(process.env.JWT_ACCES_TOKEN_TTL ?? '3600', 10),
+};
+});
+
+y luego utilizarla en authmodule:
+
+@Module({
+controllers: [AuthController],
+providers: [
+AuthService,
+{
+provide: HashingProvider, // contrato abstracto
+useClass: BcryptProvider, // implementación concreta
+},
+SignInProvider,
+],
+exports: [AuthService, HashingProvider],
+imports: [
+forwardRef(() => UsersModule),
+ConfigModule.forFeature(jwtConfig),
+JwtModule.registerAsync(jwtConfig.asProvider()),
+],
+})
+
+a.Lo importamos con ConfigModule.forFeature para poder usar las claves en el servicio y terminar de usar el servicio de JWT con authservice. Luego por otra parte le pasamos a JwtModule la config que creamos, con asProvider() que inyecta las variables directamente (usado con librerias).
+
+terminamos el signIn con los datos para generar le token, y lo devolvemos. Archivo: sign-in-provider.ts
+
+el token contiene muchos datos del usuario y se pueden verificar en https://www.jwt.io
+
+58.Guards
+
+El acces token guard analizará el request extraerá el token y dará autorización.
+Los guards pueden aplicarse a todo un controlador como a una sola ruta.
+
+nest g guard auth/guards/acces-token --no-spec
+crea un guardia tipico de nest que aplica la interfaz canActivate usada para crear guards, que controlan las peticiones.
+
+🚦 ¿Qué hace canActivate?
+
+El método canActivate() es obligatorio cuando implementás la interfaz CanActivate.
+Se ejecuta antes de que NestJS llame al controlador o al handler de una ruta.
+
+Su propósito es decidir si se permite o se bloquea el acceso a esa ruta.
+Debe devolver:
+
+true → si el acceso está permitido
+
+false → si el acceso está denegado
+
+o una Promise / Observable que resuelva a true o false.
+
+59.acces-token.guard.ts
+
+Obtiene la request actual:
+
+const request = context.switchToHttp().getRequest();
+
+Saca el token del header Authorization:
+
+const token = this.extractRequestFromHeader(request);
+
+Si no hay token, lanza un error:
+
+if (!token) throw new UnauthorizedException();
+
+Verifica que el token sea válido:
+
+const payload = await this.jwtService.verifyAsync(token, this.jwtConfiguration);
+
+Guarda el contenido del token (payload) en la request:
+
+request[REQUEST_USER_KEY] = payload;
+
+→ Esto permite que los controladores accedan al usuario autenticado con req.user (o req[REQUEST_USER_KEY]).
+
+Si todo sale bien, deja pasar la solicitud:
+
+return true;
+
+Si el token es inválido, lanza UnauthorizedException.
+
+⚙️ En resumen corto:
+
+Este guard verifica el token JWT de la cabecera.
+➡️ Si es válido, guarda los datos del usuario en request y deja continuar.
+➡️ Si no, lanza un error 401 (Unauthorized).
+
+60.Usando el guard en un modulo específico.
+
+Se necesita (al module) darle acceso al jwtService por eso es necesario importarlo.
+imports: [
+ConfigModule.forFeature(jwtConfig),
+JwtModule.registerAsync(jwtConfig.asProvider()),]
+
+Luego lo usamos en el controlador con el metodo:
+
+En este caso para crear muchos usuarios
+@UseGuards(AccesTokenGuard)
+@Post('create-many')
+
+O si queremos lo ponemos para todo el controlador.
+
+@UseGuards(AccesTokenGuard)
+@Controller('users')
+export class UsersController
+
+Para usarlo:
+
+POST http://localhost:3000/users/create-many
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIwLCJlbWFpbCI6ImFndXN0aW5hLm1hcnRpbmV6QGV4YW1wbGUuY29tIiwiaWF0IjoxNzYxNjE1NTkzLCJleHAiOjE3NjE2MTkxOTMsImF1ZCI6ImxvY2FsaG9zdDozMDAwIiwiaXNzIjoibG9jYWxob3N0OjMwMCJ9.CtmkFr6VxD-iqnTj6vPyl5Z9KbWNjtxQ4IzoWDEt5ns
+{
+"users": [.....]}
+
+61. Aplicando el guar de formal global.
+    Se aplica este objeto en el proveedor de app module. APP_GUAR es una key de nest.
+
+providers: [AppService, { provide: APP_GUARD, useClass: AccesTokenGuard }]
+imports: [
+ConfigModule.forFeature(jwtConfig),
+JwtModule.registerAsync(jwtConfig.asProvider()),]

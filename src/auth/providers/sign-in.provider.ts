@@ -27,14 +27,14 @@ export class SignInProvider {
     /**
      * Inject JWT service
      */
-    private readonly jwtService: JwtService,
+    private readonly jwtService: JwtService, //parte de JWTMODULE
     /**
      * Inject jwtConfiguration
      */
     @Inject(jwtConfig.KEY)
     private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
   ) {}
-  async signIn(signInDto: SignInDto): Promise<boolean> {
+  async signIn(signInDto: SignInDto) {
     //find the user using email id
     //throw an exception user not found
     const user = await this.userService.findOneUserByEmail(signInDto.email);
@@ -67,6 +67,6 @@ export class SignInProvider {
       },
     );
     //send confirmation
-    return true;
+    return { accesToken: accessToken };
   }
 }

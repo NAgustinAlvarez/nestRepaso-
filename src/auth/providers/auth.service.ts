@@ -15,7 +15,7 @@ export class AuthService {
     private readonly signInProvider: SignInProvider,
   ) {}
 
-  async signIn(signInDto: SignInDto): Promise<boolean> {
+  async signIn(signInDto: SignInDto) {
     return await this.signInProvider.signIn(signInDto);
   }
 

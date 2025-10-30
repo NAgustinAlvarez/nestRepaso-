@@ -22,7 +22,7 @@ import { JwtModule } from '@nestjs/jwt';
   imports: [
     forwardRef(() => UsersModule),
     ConfigModule.forFeature(jwtConfig),
-    JwtModule,
+    JwtModule.registerAsync(jwtConfig.asProvider()),
   ],
 })
 export class AuthModule {}
