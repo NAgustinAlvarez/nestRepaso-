@@ -28,6 +28,7 @@ export class AccesTokenGuard implements CanActivate {
     @Inject(jwtConfig.KEY)
     private readonly jwtConfiguration: ConfigType<typeof jwtConfig>,
   ) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     /**
      * Extract the request from  the execution context
@@ -36,7 +37,7 @@ export class AccesTokenGuard implements CanActivate {
     /**
      * Extract the token from header
      */
-    const token = this.extractRequestFromHeader(request);
+    const token = this.extractRequestFromHeader(request); //Del metodo de debajo
     /**
      * Validate the token
      */
@@ -49,6 +50,14 @@ export class AccesTokenGuard implements CanActivate {
         token,
         this.jwtConfiguration,
       );
+      //ej:
+      // {
+      //   sub: 42,
+      //   email: 'nico@example.com',
+      //   role: 'admin',
+      //   iat: 1730650247,
+      //   exp: 1730653847
+      // }
       request[REQUEST_USER_KEY] = payload; //GUARDO EL PAYLOAD EN LA REQUEST PARA QUE SIGA EN EL CICLO
       console.log(payload);
     } catch (error) {
