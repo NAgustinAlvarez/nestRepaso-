@@ -1,5 +1,6 @@
 POST http://localhost:3000/posts 
 Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjIwLCJlbWFpbCI6ImFndXN0aW5hLm1hcnRpbmV6QGV4YW1wbGUuY29tIiwiaWF0IjoxNzYyMjkwMzM1LCJleHAiOjE3NjIyOTM5MzUsImF1ZCI6ImxvY2FsaG9zdDozMDAwIiwiaXNzIjoibG9jYWxob3N0OjMwMCJ9.X7MYLV47_ni88lbfabHPJpTHQ8Ww8Li1gXwqxpwSZl0
 {
   "title": "Mi primer post Valentina",
   "postType": "post",

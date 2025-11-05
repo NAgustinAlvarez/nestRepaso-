@@ -59,7 +59,7 @@ export class AccesTokenGuard implements CanActivate {
       //   exp: 1730653847
       // }
       request[REQUEST_USER_KEY] = payload; //GUARDO EL PAYLOAD EN LA REQUEST PARA QUE SIGA EN EL CICLO
-      console.log(payload);
+      // console.log(payload);
     } catch (error) {
       throw new UnauthorizedException();
     }

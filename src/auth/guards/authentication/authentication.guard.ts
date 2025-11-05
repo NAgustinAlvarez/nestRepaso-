@@ -31,7 +31,7 @@ export class AuthenticationGuard implements CanActivate {
     this.authTypeGuardMap = {
       [AuthType.Bearer]: [this.accesTokenGuard],
       [AuthType.None]: [{ canActivate: () => true }], // objeto con interfaz canActivate
-    };
+    }; // Luego se ve [1,0] porque Authtype es un enum, y nest imprime valores numéricos para enums
   }
 
   async canActivate(context: ExecutionContext) {
@@ -39,7 +39,12 @@ export class AuthenticationGuard implements CanActivate {
     const authTypes = this.reflector.getAllAndMerge(AUTH_TYPE_KEY, [
       context.getHandler(),
       context.getClass(),
-    ]) || [AuthenticationGuard.defaultAuthType];
+    ]);
+    // FIX: Usa length > 0 para detectar array vacío
+    const finalAuthTypes =
+      authTypes?.length > 0 ? authTypes : [AuthenticationGuard.defaultAuthType];
+
+    // console.log('PRIMER CONSOLE', finalAuthTypes); // ← AHORA [1]
 
     //Explicación.
     //Reflector analiza los metadatos con la clave y getAllAndMerge crea como una especie de objeto del método y la clase. Se evalúa por orden: si se encuentra la clave, se toma la del método; si no, la de la clase.
@@ -56,24 +61,26 @@ export class AuthenticationGuard implements CanActivate {
     //devolvería por ejemplo authTypes = [AuthType.Bearer, AuthType.None]
     // }
     //Show authTypes
-    console.log('PRIMER CONSOLE', authTypes);
-    const guards = authTypes.map((type) => this.authTypeGuardMap[type]).flat(); //El método .flat() aplana (flatten) un array anidado, es decir, toma arrays dentro de arrays y los convierte en un solo nivel.
+
+    const guards = finalAuthTypes
+      .map((type) => this.authTypeGuardMap[type])
+      .flat(); //El método .flat() aplana (flatten) un array anidado, es decir, toma arrays dentro de arrays y los convierte en un solo nivel.
 
     //print all the guards
-    console.log('SEGUNDO CONSOLE', guards);
+    // console.log('SEGUNDO CONSOLE', guards);
 
     //default error
     const error = new UnauthorizedException();
 
     //Loop guards canActivate
     for (const instance of guards) {
-      console.log('TERCER CONSOLE', instance);
+      // console.log('TERCER CONSOLE', instance);
       const canActivate = await Promise.resolve(
         instance.canActivate(context),
       ).catch((err) => {
         err: error;
       });
-      console.log('CUARTO CONSOLE', canActivate);
+      // console.log('CUARTO CONSOLE', canActivate);
       if (canActivate) {
         return true;
       }
