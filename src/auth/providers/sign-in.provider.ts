@@ -20,6 +20,9 @@ import { GenerateTokensProvider } from './generate-tokens.provider';
 @Injectable()
 export class SignInProvider {
   constructor(
+    /**
+     * Inject userService
+     */
     @Inject(forwardRef(() => UserService))
     private readonly userService: UserService,
     /**

@@ -5,6 +5,8 @@ import { UserService } from 'src/users/providers/users.service';
 import { SignInDto } from '../dtos/signin.dto';
 import { HashingProvider } from './hashing.provider';
 import { SignInProvider } from './sign-in.provider';
+import { RefreshTokenDto } from '../dtos/refreshToken.dto';
+import { RefreshTokensProvider } from './refresh-tokens.provider';
 
 @Injectable()
 export class AuthService {
@@ -13,13 +15,14 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly hashingProvider: HashingProvider,
     private readonly signInProvider: SignInProvider,
+    private readonly refreshTokensProvider: RefreshTokensProvider,
   ) {}
 
   async signIn(signInDto: SignInDto) {
     return await this.signInProvider.signIn(signInDto);
   }
 
-  isAuth() {
-    return true;
+  async refreshTokens(refreshTokenDto: RefreshTokenDto) {
+    return await this.refreshTokensProvider.refreshTokens(refreshTokenDto);
   }
 }

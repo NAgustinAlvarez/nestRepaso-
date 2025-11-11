@@ -95,7 +95,7 @@ export class UserService {
   }
 
   async findOneById(id: number) {
-    let user: FetchUserDto | null;
+    let user: User | null;
     try {
       user = await this.usersRepository.findOneBy({ id });
     } catch (error) {
