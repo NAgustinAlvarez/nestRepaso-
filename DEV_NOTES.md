@@ -1944,3 +1944,12 @@ create(@ActiveUser() user: ActiveUserData) {
 console.log('user?', user);}
 
 key of del decorador nos permite obtener las claves indicadas en ActiveUserData en esta caso sub | email
+ej: create(@ActiveUser("sub") user: ActiveUserData)
+
+66- Provider de post con uso del decorador que extrae datos del token.
+nest g pr posts/providers/create-post.provider --flat --no-spec
+
+67-Refresh token.
+El refresh token es almacenado en el frontend al igual que el jwt, luego cuando jwt está por expirar este refres se manda a una dirección específica que lo valida y entrega otro jwt.
+
+Agregammos la variable con duración mayor a las de entorno y modificamos jwt.config y environment.validation para contengan el nuevo valor y que lo validen.

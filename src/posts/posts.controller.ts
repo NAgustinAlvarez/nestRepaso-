@@ -56,7 +56,6 @@ export class PostsController {
     @ActiveUser() user: ActiveUserData,
   ) {
     console.log('user?', user);
-
     return this.postsService.create(createPostDto, user);
   }
 
