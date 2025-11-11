@@ -19,7 +19,10 @@ import { UserService } from './providers/users.service';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { CreateManyUsersDto } from './dtos/create-many-users.dto';
 import { AccesTokenGuard } from 'src/auth/guards/acces-token/acces-token.guard';
+import { Auth } from 'src/auth/decorator/auth.decorator';
+import { AuthType } from 'src/auth/constants/auth-type.enum';
 
+@Auth(AuthType.Bearer)
 @Controller('users')
 export class UsersController {
   constructor(private readonly userService: UserService) {}
@@ -64,12 +67,13 @@ export class UsersController {
   ) {
     return this.userService.findOneById(id);
   }
+
   @Post()
+  @Auth(AuthType.None)
   createUsers(@Body() createUserDto: CreateUserDto) {
     return this.userService.createUser(createUserDto);
   }
 
-  @UseGuards(AccesTokenGuard)
   @Post('create-many')
   async createManyUsers(@Body() createManyUsersDto: CreateManyUsersDto) {
     return await this.userService.createMany(createManyUsersDto);

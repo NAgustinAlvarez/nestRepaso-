@@ -22,6 +22,8 @@ import { GetPostDto } from '../dtos/get-post.dto';
 import { Paginated } from 'src/common/pagination/interfaces/paginated.interface';
 import { PaginationProvider } from 'src/common/pagination/providers/pagination.provider';
 import { User } from 'src/users/user.entity';
+import { CreatePostProvider } from './create-post.provider';
+import { ActiveUserData } from 'src/auth/interfaces/active-user.interface';
 
 @Injectable()
 export class PostsService {
@@ -32,27 +34,10 @@ export class PostsService {
     private readonly userService: UserService,
     private readonly tagsService: TagsService,
     private readonly paginationProvider: PaginationProvider,
+    private readonly cratePostProvider: CreatePostProvider,
   ) {}
-  async create(createPostDto: CreatePostDto) {
-    //find author
-    let author = await this.userService.findOneById(createPostDto.authorId);
-    if (!author) {
-      throw new NotFoundException(
-        `Usuario con ID ${createPostDto.authorId} no encontrado`,
-      );
-    }
-    //find tags
-    const tags = createPostDto.tags
-      ? await this.tagsService.findMultipleTags(createPostDto.tags)
-      : [];
-    //create post
-    let post = this.postRepository.create({
-      ...createPostDto,
-      author: author,
-      tags: tags,
-    });
-
-    return this.postRepository.save(post);
+  async create(createPostDto: CreatePostDto, user: ActiveUserData) {
+    await this.cratePostProvider.create(createPostDto, user);
   }
   async findAll(
     postQuery: GetPostDto,

@@ -906,8 +906,6 @@ DB_NAME=postgres
 
 👉 Resumen: sí podés usar process.env, pero en NestJS se recomienda ConfigService porque es más limpio, testeable y escalable.
 
-¿Querés que te muestre cómo agregar validación de variables con @nestjs/config + Joi para asegurarte que las del .env estén correctas al levantar la app?
-
 42.Customización de configuración.
 En proyectos más grandes se recomienda crear un archivo especial llamado appConfig donde se tendrán las variables de entorno centralizadas. Agrupa la configuración de distintos modulos en secciones claras, porque por ejemplo podemos tener muchos modulos o funcionalidades con diferentes variables de entorno. Permiten acceder a las variables de entorno con rutas más legibles.
 
@@ -1038,7 +1036,8 @@ private readonly usersRepository: Repository<User>,
 
 D. Luego se usa con this.profileConfiguration
 
-45. Validating enviroments variables.
+45. Validating enviroments variables Joi.
+    environment.validation.ts
 
 Usamos un package llamado joi
 npm i joI.
@@ -1858,7 +1857,7 @@ Luego lo usamos en el controlador con el metodo:
 
 En este caso para crear muchos usuarios
 @UseGuards(AccesTokenGuard)
-@Post('create-many')
+@Post('create-many')....
 
 O si queremos lo ponemos para todo el controlador.
 
@@ -1881,3 +1880,76 @@ providers: [AppService, { provide: APP_GUARD, useClass: AccesTokenGuard }]
 imports: [
 ConfigModule.forFeature(jwtConfig),
 JwtModule.registerAsync(jwtConfig.asProvider()),]
+
+62. Decorators (Auth).
+    Los decoradores generan metadatos para proporcionarlos a nestjs y saber como operar el codigo. Por ejemplo pueden ser de clases @Controller, metodos @Post, o parametros @Body, etc.
+
+Estos decoradores cambian el comportamiento del framework y puden utilizarse a nuestro favor por ejemplo en los casos de guards, seteando valores según que queramos proteger o no. Los guards analizaran estos datos.
+
+Se pueden crear metadatos personalizados con Reflect.metadata() o SetMetadata(), para asociar valores o permisos personalizados a controladores o métodos.
+
+63.Creación de decorador para guard.
+
+nest g d auth/decorator/auth --flat --no-spec
+
+genera un guardía generico que asigna un valor a una clave.
+Nosotros podemos modificarlo para que estas asignaciones sean a valores seguros.
+
+auth.decorator.ts
+
+import { SetMetadata } from '@nestjs/common';
+import { AuthType } from '../constants/auth-type.enum';
+import { AUTH_TYPE_KEY } from '../constants/auth.constants';
+export const Auth = (...authType: AuthType[]) =>
+SetMetadata(AUTH_TYPE_KEY, authType);
+
+Luego solo los importamos a donde querramos y los usamos llamando al decorador y dando un valor.
+
+@Auth(AuthType.None) por ejemplo.
+
+64. Guardia de autenticación.
+    Authentication guard será nuestro guardia global. Y usará a accesTokenGuard, servicio de google u otros guardias o modulos relacionados.
+
+@Auth() _Decorador personalizado_ --> None || Bearer
+|
+v
+Authentication Guard--> Accestoken guard
+
+$ nest g guard auth/guards/authentication --no-spec
+
+authentication.guard.ts
+a- Tipo default Bearer.
+b- AuthTypeGuardMap definido como clave valor con Record AuthType:CanActivate[]
+c-Reflector lee metadatos y accesTokenGuard guardia de tokens.
+d- metodo asincrono canActivate es usado por los guardias de nestjs y este usa el contexto.
+Obtiene los metadatos usando el reflector y les asigna la clave authTypes, getAllAndMerge busca la clave en el controlador y el metodo dandole prioridad el metodo.
+Devuelve un array tipo [1,0] porque nest no muestra las claves enums.
+e- Se hace un map con los valores y se accede al valor de AuthTypeGuardMap y se imprime.
+f- el loop recorre los guardias espera resolver una promesa pasada a cada guardia con su metodo canActivate(los dos tienen) si canActivate es true devuelve true y sale, sino devuelve un unauthorized.
+
+65. Custom decorator para extraccion del payload
+    Documentación: https://docs.nestjs.com/custom-decorators
+
+export const ActiveUser = createParamDecorator(
+(field: keyof ActiveUserData | undefined, ctx: ExecutionContext) => {
+const request = ctx.switchToHttp().getRequest();
+const user: ActiveUserData = request[REQUEST_USER_KEY];
+return field ? user?.[field] : user;
+},
+);
+
+extrae el request con la clave que tiene todo el payload, luego para usarlo +
+@Post()
+create(@ActiveUser() user: ActiveUserData) {
+console.log('user?', user);}
+
+key of del decorador nos permite obtener las claves indicadas en ActiveUserData en esta caso sub | email
+ej: create(@ActiveUser("sub") user: ActiveUserData)
+
+66- Provider de post con uso del decorador que extrae datos del token.
+nest g pr posts/providers/create-post.provider --flat --no-spec
+
+67-Refresh token.
+El refresh token es almacenado en el frontend al igual que el jwt, luego cuando jwt está por expirar este refres se manda a una dirección específica que lo valida y entrega otro jwt.
+
+Agregammos la variable con duración mayor a las de entorno y modificamos jwt.config y environment.validation para contengan el nuevo valor y que lo validen.
