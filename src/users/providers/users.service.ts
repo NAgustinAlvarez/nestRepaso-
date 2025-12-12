@@ -23,6 +23,9 @@ import { UsersCreateManyProvider } from './users-create-many.provider';
 import { CreateManyUsersDto } from '../dtos/create-many-users.dto';
 import { CreateUserProvider } from './create-user.provider';
 import { FindOneUserByEmailProvider } from './find-one-user-by-email.provider';
+import { FindOneByGoogleIdProvider } from './find-one-by-google-id.provider';
+import { CreateGoogleUserProvider } from './create-google-user.provider';
+import { GoogleUserInterface } from '../interfaces/google-user.interface';
 @Injectable()
 export class UserService {
   constructor(
@@ -60,6 +63,14 @@ export class UserService {
      * Inject FindOneUserByEmailProvider
      */
     private readonly findOneUserByEmailProvider: FindOneUserByEmailProvider,
+    /**
+     * Inject findOneByGoogleIdProvider
+     */
+    private readonly findOneByGoogleIdProvider: FindOneByGoogleIdProvider,
+    /**
+     * Inject createGoogleUserProvider
+     */
+    private readonly createGoogleUserProvider: CreateGoogleUserProvider,
   ) {}
 
   async createUser(createUserDto: CreateUserDto) {
@@ -117,5 +128,12 @@ export class UserService {
   }
   async findOneUserByEmail(email: string): Promise<User> {
     return await this.findOneUserByEmailProvider.findOneUserByEmail(email);
+  }
+  async findOneByGoogleId(googleId: string) {
+    return await this.findOneByGoogleIdProvider.findOneByGoogleId(googleId);
+  }
+  async createGoogleUser(googleUser: GoogleUserInterface) {
+    console.log('EN GOOGLE USER', googleUser);
+    return await this.createGoogleUserProvider.createGoogleUser(googleUser);
   }
 }

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -16,6 +17,7 @@ import { ConfigType } from '@nestjs/config';
 import jwtConfig from '../config/jwt.config';
 import { ActiveUserData } from '../interfaces/active-user.interface';
 import { GenerateTokensProvider } from './generate-tokens.provider';
+import { BaseExceptionFilter } from '@nestjs/core';
 
 @Injectable()
 export class SignInProvider {
@@ -50,6 +52,7 @@ export class SignInProvider {
 
     //compare password to the hash
     let isEqual: boolean = false;
+    if (!user?.password) throw new BadRequestException(); //cuidado con esto
     try {
       isEqual = await this.hashingProvider.comparePassword(
         signInDto.password,

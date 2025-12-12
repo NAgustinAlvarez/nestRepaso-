@@ -25,5 +25,5 @@ export class FetchUserDto {
 
   @IsString()
   @IsNotEmpty()
-  password: string;
+  password?: string;
 }
