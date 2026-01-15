@@ -16,8 +16,9 @@ export class User {
   @Exclude()
   password?: string;
   @Column({ type: 'varchar', length: 96, nullable: true, unique: true })
-  googleId?: string;
   @Exclude()
+  googleId?: string;
+
   @OneToMany(() => Post, (post) => post.author)
   post: Post[];
 }

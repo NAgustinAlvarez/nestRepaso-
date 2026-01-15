@@ -2132,17 +2132,17 @@ password: string;
 
 Esto hace que password NO aparezca en la respuesta, aunque existe en el objeto.
 
-74. Aplicando los interceptores para serializar y ocultar campos sensibles. 
+74. Aplicando los interceptores para serializar y ocultar campos sensibles.
 
-En el controlador de creación de usuario user.controller.ts  aplicamos el @UseInterceptors(ClassSerializerInterceptor)
-Luego en la entidad user ponemos el decorador @Exclude() a los campos que no queremos que aparezcan. 
+En el controlador de creación de usuario user.controller.ts aplicamos el @UseInterceptors(ClassSerializerInterceptor)
+Luego en la entidad user ponemos el decorador @Exclude() a los campos que no queremos que aparezcan; como por ejemplo en user entity en googleId o password.
 
-75. Global Data Interceptor. 
-Vamos a generar un interceptor para aplicar un formato a todas las respuestas. El interceptor generará respuestas generales aplicadas a toda la aplicación en formato: 
-{ apiVersion: string, data: {}}
+75. Global Data Interceptor.
+    Vamos a generar un interceptor para aplicar un formato a todas las respuestas. El interceptor generará respuestas generales aplicadas a toda la aplicación en formato:
+    { apiVersion: string, data: {}}
 
 nest g interceptor common/interceptors/data-response --no-spec
-Los interceptores implementan una interface que espera un contexto y una función handler. 
+Los interceptores implementan una interface que espera un contexto y una función handler.
 
 Los interceptores trabajan con observables llamados RxJS Ejemplo mental
 

@@ -10,6 +10,6 @@ import { Observable, tap } from 'rxjs';
 export class DataResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     console.log('Before...');
-    return next.handle().pipe(tap((data) => console.log(data)));
+    return next.handle().pipe(tap((data) => console.log('After:', data)));
   }
 }
