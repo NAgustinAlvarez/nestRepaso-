@@ -93,7 +93,7 @@ export class UserService {
     throw new HttpException(
       {
         status: HttpStatus.MOVED_PERMANENTLY,
-        error: 'The API endopint does not exist',
+        error: 'prueba de servicio',
         filename: 'user.service.ts',
         linenumber: 84,
       },
