@@ -13,6 +13,10 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+  app.enableCors({
+    origin: '*',
+  });
+
   //** swagger configuration */
 
   const config = new DocumentBuilder()

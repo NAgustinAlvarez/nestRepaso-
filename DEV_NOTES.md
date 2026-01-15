@@ -1952,4 +1952,206 @@ nest g pr posts/providers/create-post.provider --flat --no-spec
 67-Refresh token.
 El refresh token es almacenado en el frontend al igual que el jwt, luego cuando jwt está por expirar este refres se manda a una dirección específica que lo valida y entrega otro jwt.
 
-Agregammos la variable con duración mayor a las de entorno y modificamos jwt.config y environment.validation para contengan el nuevo valor y que lo validen.
+Agregammos la variable con duración mayo (refresh) JWT_REFRESH_TOKEN_TTL=86400, a las de entorno y modificamos jwt.config y environment.validation para contengan el nuevo valor y que lo validen. Creamos en refreshToken.dto.ts.
+
+nest g pr auth/providers/generate-tokens.provider --flat --no-spec
+va a generar los dos tipos de token haciendo uso de la entidad user y el jwt configuration. El primero con menor tiempo de vida
+
+nest g pr auth/providers/refresh-tokens.provider --flat --no-spec
+hará uso de generatetoken pero será para refrescar. Por el body del controlador vendrá el refresh que se usará en el veryfyAsync. Esto devuelve el payload. Del payload obtenemos el usuario por findById. Y luego entregamos el usuario al generate token provider.
+
+Luego ponemos el refreshToken como proveedor de authService y generamos el controlador.
+@Post('refresh-tokens')
+@HttpCode(HttpStatus.OK)
+async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
+return await this.authService.refreshTokens(refreshTokenDto);
+}
+
+La solicitud necesitará tanto un Bearer como un body con el refresToken.
+
+68. Google authentication
+    Logica de la autenticación de google.
+
+a.En el front se iniciará el sign in a través de un botón que redigira al modal de iniciar sesión de google.
+b.Se inicia el proceso de inicio de sesión, google genera un jwt loginTicket que se envíará al back.
+c.Se envía el jwt a la nestjs api que valida el google token.
+d.Proceso de chequeo de existencia de usuario, sino se crea uno. Luego se genera un nuevo token perteneciente a la api para poder operar.
+
+69. Credenciales de google cloud.
+    se creará el la api de nuestra aplicación con cloud de google.
+    luego en las variables de entorno se crearán dos variables con códigos dados por google al configurar al auth0.
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+Las agregamos al archivo de configuración de las variables de JWT.
+
+se usa una libreria para el uso de google auth.
+npm i google-auth-library
+
+Crearemos dos archivos:
+1- Uno que va controlador, para manejar las rutas para google athentication.
+2- Otro service files.
+
+npm nest g co auth/social/google-authentication --flat --no-spec
+nest g s auth/social/providers/google-authentication.service --flat --no-spec
+
+generamos un dto para el token de google que vendrá del navegador se extraera el token y se iniciará sesión en caso de que exista usuario. Por eso es necesario cambiar la entidad usuario y poner nullable true y "?" en la contraseña ya que los usuario creados con google no tendrán contraseña, luego se puede agregar.
+
+@Column({ type: 'varchar', length: 96, nullable: true, unique: true })
+password?: string;
+
+y agregamos
+
+@Column({ type: 'varchar', length: 96, nullable: true, unique: true })
+googleId?: string;
+
+70.Inicializadno google auth.
+archivo:
+google-authentication-service.service
+
+a) Constructor
+
+✔ Recibe la configuración inyectada:
+
+@Inject(jwtConfig.KEY)
+private readonly jwtConfiguration: ConfigType<typeof jwtConfig>
+
+👉 En este paso solo se guardan los valores: clientId, clientSecret, etc.
+
+No se crea el cliente de Google todavía.
+
+b) Propiedad de clase
+private oauthClient: OAuth2Client;
+
+✔ Declara una variable en la clase
+❌ No asigna nada
+❌ No instancia nada
+
+👉 Solo dice: “voy a tener un OAuth2Client acá”.
+
+c) onModuleInit()
+onModuleInit() {
+const clientId = this.jwtConfiguration.googleClientId;
+const clientSecret = this.jwtConfiguration.googleClientSecret;
+this.oauthClient = new OAuth2Client(clientId, clientSecret);
+}
+
+✔ Se ejecuta cuando Nest ya terminó de inicializar el módulo
+✔ Crea el cliente de Google con las credenciales
+✔ Lo asigna a this.oauthClient
+👉 Ahora sí el servicio queda completamente listo.
+
+d) ¿Para qué sirve this.oauthClient?
+
+Sirve para:
+
+verificar tokens de Google
+
+validar usuarios
+
+obtener info del usuario
+
+manejar el flujo OAuth2
+
+Ejemplo típico posterior:
+
+const ticket = await this.oauthClient.verifyIdToken({
+idToken,
+audience: this.jwtConfiguration.googleClientId,
+});
+
+71.Implementación de la autenticación de google.
+
+nest g pr users/providers/find-one-by-google-id.provider --flat --no-spec
+
+72.Google authentication service.
+Recibe el token de google, lo verifica, obtiene datos del payload, busca un usuario y si no existe crea uno.
+
+nest g pr users/providers/create-google-user.provider --flat --no-spec
+
+para usar un metodo de creación de usuarios para google.
+
+73.Interceptor y serialization.
+✅ Qué es un Interceptor en NestJS
+
+Un Interceptor es una clase que se ejecuta antes y/o después de que un controlador maneje una petición.
+
+Es como un middleware con superpoderes, pero ubicado dentro del ciclo interno de Nest.
+
+Sirve para:
+
+Transformar la respuesta antes de enviarla
+
+Modificar la request
+
+Agregar lógica de logging
+
+Manejar errores globalmente
+
+Medir tiempos de ejecución
+
+Serializar objetos (como el ClassSerializerInterceptor)
+
+Cachear respuestas
+
+Ejemplo visual del flujo:
+Request → Interceptor → Controller → Service → Response → Interceptor → Cliente
+
+🟦 Qué es "Serialization" (Serialización)
+
+La serialización es el proceso de transformar un objeto interno de la app (por ejemplo, una entidad de TypeORM) en un objeto que se pueda enviar al cliente (JSON limpio).
+
+En Nest se usa para:
+
+Ocultar campos sensibles (password, tokens, etc.)
+
+Renombrar propiedades
+
+Filtrar datos innecesarios
+
+Formatear objetos antes de devolverlos
+
+Nest trae un interceptor listo para esto:
+
+👉 ClassSerializerInterceptor
+
+Funciona junto con decoradores de class-transformer.
+
+Ejemplo:
+
+import { Exclude } from 'class-transformer';
+
+export class UserEntity {
+id: number;
+email: string;
+
+@Exclude()
+password: string;
+}
+
+Esto hace que password NO aparezca en la respuesta, aunque existe en el objeto.
+
+74. Aplicando los interceptores para serializar y ocultar campos sensibles. 
+
+En el controlador de creación de usuario user.controller.ts  aplicamos el @UseInterceptors(ClassSerializerInterceptor)
+Luego en la entidad user ponemos el decorador @Exclude() a los campos que no queremos que aparezcan. 
+
+75. Global Data Interceptor. 
+Vamos a generar un interceptor para aplicar un formato a todas las respuestas. El interceptor generará respuestas generales aplicadas a toda la aplicación en formato: 
+{ apiVersion: string, data: {}}
+
+nest g interceptor common/interceptors/data-response --no-spec
+Los interceptores implementan una interface que espera un contexto y una función handler. 
+
+Los interceptores trabajan con observables llamados RxJS Ejemplo mental
+
+➡️ Un Promise es como pedir un delivery y esperar sentado.
+No podés cambiar nada durante el proceso.
+
+➡️ Un Observable es como ver el paquete en tiempo real mientras avanza.
+Podés espiar, modificar, cancelar, etc.
+
+Promesas sirven para obtener un valor una vez.
+Observables sirven para manipular, transformar o interceptar flujos de datos.
+Eso es EXACTAMENTE lo que un interceptor necesita hacer.
