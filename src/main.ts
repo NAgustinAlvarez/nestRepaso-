@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { DataResponseInterceptor } from './common/interceptors/data-response/data-response.interceptor';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(
@@ -30,8 +30,7 @@ async function bootstrap() {
   app.enableCors({
     origin: '*',
   });
-  // Add global Interceptor
-  app.useGlobalInterceptors(new DataResponseInterceptor());
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

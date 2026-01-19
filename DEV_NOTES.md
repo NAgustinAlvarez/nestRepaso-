@@ -2144,7 +2144,7 @@ Luego en la entidad user ponemos el decorador @Exclude() a los campos que no que
 nest g interceptor common/interceptors/data-response --no-spec
 Los interceptores implementan una interface que espera un contexto y una función handler.
 
-Los interceptores trabajan con observables llamados RxJS Ejemplo mental
+Los interceptores trabajan con observables llamados RxJS. Ejemplo mental:
 
 ➡️ Un Promise es como pedir un delivery y esperar sentado.
 No podés cambiar nada durante el proceso.
@@ -2155,3 +2155,32 @@ Podés espiar, modificar, cancelar, etc.
 Promesas sirven para obtener un valor una vez.
 Observables sirven para manipular, transformar o interceptar flujos de datos.
 Eso es EXACTAMENTE lo que un interceptor necesita hacer.
+
+return next.handle().pipe(tap((data) => console.log(data)));
+
+pipe metodo de RxJs para encadenar operadores, tap observa el valor devuelto por el controlador.
+
+Lo implementamos en main.ts
+// Add global Interceptor
+app.useGlobalInterceptors(new DataResponseInterceptor());
+
+76.Implementación global con datos en .env
+//En app.module.ts
+{ provide: APP_INTERCEPTOR, useClass: DataResponseInterceptor },
+Para implementarlo globalmente (es otra forma)
+
+//data-response.interceptor.ts
+@Injectable()
+export class DataResponseInterceptor implements NestInterceptor {
+constructor(private readonly configService: ConfigService) {}
+intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+console.log('Before...');
+return next.handle().pipe(
+map((data) => ({
+apiVersion: this.configService.get('appConfig.apiVersion'),
+data: data,
+})),
+);
+}
+}
+el metodo map a diferencia del tap puede modificar lo devuelto por el controlador. Lu
